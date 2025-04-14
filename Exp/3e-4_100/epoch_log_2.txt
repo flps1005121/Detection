@@ -1,0 +1,142 @@
+Total training samples: 22
+Epoch [1/100], Loss: 1.0942
+Epoch [2/100], Loss: 0.8561
+Epoch [3/100], Loss: 0.7827
+Epoch [4/100], Loss: 0.6274
+Epoch [5/100], Loss: 0.7538
+Epoch [6/100], Loss: 0.5483
+Epoch [7/100], Loss: 0.6640
+Epoch [8/100], Loss: 0.6384
+Epoch [9/100], Loss: 0.5431
+Epoch [10/100], Loss: 0.6515
+Epoch [11/100], Loss: 0.5392
+Epoch [12/100], Loss: 0.5866
+Epoch [13/100], Loss: 0.4699
+Epoch [14/100], Loss: 0.5017
+Epoch [15/100], Loss: 0.5472
+Epoch [16/100], Loss: 0.5406
+Epoch [17/100], Loss: 0.4611
+Epoch [18/100], Loss: 0.5218
+Epoch [19/100], Loss: 0.5163
+Epoch [20/100], Loss: 0.6245
+Epoch [21/100], Loss: 0.6345
+Epoch [22/100], Loss: 0.7123
+Epoch [23/100], Loss: 0.4525
+Epoch [24/100], Loss: 0.5083
+Epoch [25/100], Loss: 0.8054
+Epoch [26/100], Loss: 0.8392
+Epoch [27/100], Loss: 0.6731
+Epoch [28/100], Loss: 0.5866
+Epoch [29/100], Loss: 0.5384
+Epoch [30/100], Loss: 0.8137
+Epoch [31/100], Loss: 0.5932
+Epoch [32/100], Loss: 0.6423
+Epoch [33/100], Loss: 0.6110
+Epoch [34/100], Loss: 0.5285
+Epoch [35/100], Loss: 0.5860
+Epoch [36/100], Loss: 0.7372
+Epoch [37/100], Loss: 0.5792
+Epoch [38/100], Loss: 0.7860
+Epoch [39/100], Loss: 0.6156
+Epoch [40/100], Loss: 0.9592
+Epoch [41/100], Loss: 0.6835
+Epoch [42/100], Loss: 0.6556
+Epoch [43/100], Loss: 0.7388
+Epoch [44/100], Loss: 0.5952
+Epoch [45/100], Loss: 0.6756
+Epoch [46/100], Loss: 0.6295
+Epoch [47/100], Loss: 0.7956
+Epoch [48/100], Loss: 0.9597
+Epoch [49/100], Loss: 0.7852
+Epoch [50/100], Loss: 0.7694
+Epoch [51/100], Loss: 0.6481
+Epoch [52/100], Loss: 0.4804
+Epoch [53/100], Loss: 0.5057
+Epoch [54/100], Loss: 0.4801
+Epoch [55/100], Loss: 0.5968
+Epoch [56/100], Loss: 0.7228
+Epoch [57/100], Loss: 0.6815
+Epoch [58/100], Loss: 0.6611
+Epoch [59/100], Loss: 0.6807
+Epoch [60/100], Loss: 0.7184
+Epoch [61/100], Loss: 0.6468
+Epoch [62/100], Loss: 0.9054
+Epoch [63/100], Loss: 0.7846
+Epoch [64/100], Loss: 0.5828
+Epoch [65/100], Loss: 0.6654
+Epoch [66/100], Loss: 0.7462
+Epoch [67/100], Loss: 0.5536
+Epoch [68/100], Loss: 0.4971
+Epoch [69/100], Loss: 0.8174
+Epoch [70/100], Loss: 0.6210
+Epoch [71/100], Loss: 0.5712
+Epoch [72/100], Loss: 0.5157
+Epoch [73/100], Loss: 0.5895
+Epoch [74/100], Loss: 0.6722
+Epoch [75/100], Loss: 0.4937
+Epoch [76/100], Loss: 0.5177
+Epoch [77/100], Loss: 0.5647
+Epoch [78/100], Loss: 0.4740
+Epoch [79/100], Loss: 0.4603
+Epoch [80/100], Loss: 0.4321
+Epoch [81/100], Loss: 0.4719
+Epoch [82/100], Loss: 0.5490
+Epoch [83/100], Loss: 0.4949
+Epoch [84/100], Loss: 0.6172
+Epoch [85/100], Loss: 0.7418
+Epoch [86/100], Loss: 0.5524
+Epoch [87/100], Loss: 0.5571
+Epoch [88/100], Loss: 0.4193
+Epoch [89/100], Loss: 0.5922
+Epoch [90/100], Loss: 0.6252
+Epoch [91/100], Loss: 0.4828
+Epoch [92/100], Loss: 0.4720
+Epoch [93/100], Loss: 0.5432
+Epoch [94/100], Loss: 0.4200
+Epoch [95/100], Loss: 0.7386
+Epoch [96/100], Loss: 0.6477
+Epoch [97/100], Loss: 0.6411
+Epoch [98/100], Loss: 0.5528
+Epoch [99/100], Loss: 0.6245
+Epoch [100/100], Loss: 0.6000
+Train class_to_idx: {'bus_stop_gym': 0, 'bus_stop_xiang_feng': 1, 'ntou_donut': 2, 'ntou_freedom_ship': 3}
+Class bus_stop_gym has 5 samples
+Class bus_stop_xiang_feng has 5 samples
+Class ntou_donut has 6 samples
+Class ntou_freedom_ship has 6 samples
+Support set size: 12 samples
+Query set size: 10 samples
+Query 0: True = bus_stop_gym, Predicted = ntou_freedom_ship
+Query 1: True = bus_stop_gym, Predicted = bus_stop_xiang_feng
+Query 2: True = bus_stop_xiang_feng, Predicted = bus_stop_xiang_feng
+Query 3: True = bus_stop_xiang_feng, Predicted = bus_stop_xiang_feng
+Query 4: True = ntou_donut, Predicted = ntou_donut
+Query 5: True = ntou_donut, Predicted = bus_stop_gym
+Query 6: True = ntou_donut, Predicted = ntou_donut
+Query 7: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Query 8: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Query 9: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Few-shot prototype classification accuracy: 0.70
+Test class_to_idx: {'bus_stop_gym': 0, 'bus_stop_xiang_feng': 1, 'ntou_donut': 2, 'ntou_freedom_ship': 3}
+GT: bus_stop_gym, Pred: ntou_freedom_ship
+GT: bus_stop_xiang_feng, Pred: bus_stop_xiang_feng
+GT: ntou_donut, Pred: ntou_donut
+GT: ntou_freedom_ship, Pred: bus_stop_gym
+Test accuracy: 0.50
+
+[AutoEval] Running experiments for few_shot_k = 1 to 5
+
+[AutoEval] --- Testing few_shot_k = 1 ---
+→ Train acc = 0.78, Test acc = 0.75
+
+[AutoEval] --- Testing few_shot_k = 2 ---
+→ Train acc = 0.71, Test acc = 0.50
+
+[AutoEval] --- Testing few_shot_k = 3 ---
+→ Train acc = 0.70, Test acc = 0.75
+
+[AutoEval] --- Testing few_shot_k = 4 ---
+→ Train acc = 0.83, Test acc = 0.50
+
+[AutoEval] --- Testing few_shot_k = 5 ---
+→ Train acc = 1.00, Test acc = 0.75

@@ -1,6 +1,0 @@
-few_shot_k, Train acc, Test acc
-few_shot_k=1, Train acc=0.94, Test acc=0.75
-few_shot_k=2, Train acc=0.93, Test acc=0.75
-few_shot_k=3, Train acc=1.00, Test acc=0.75
-few_shot_k=4, Train acc=0.83, Test acc=0.75
-few_shot_k=5, Train acc=0.50, Test acc=0.75

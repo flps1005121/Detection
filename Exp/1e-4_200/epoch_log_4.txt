@@ -1,0 +1,242 @@
+Total training samples: 22
+Epoch [1/200], Loss: 1.4555
+Epoch [2/200], Loss: 0.9418
+Epoch [3/200], Loss: 0.7309
+Epoch [4/200], Loss: 0.7365
+Epoch [5/200], Loss: 0.6947
+Epoch [6/200], Loss: 0.6033
+Epoch [7/200], Loss: 0.6606
+Epoch [8/200], Loss: 0.6964
+Epoch [9/200], Loss: 0.6369
+Epoch [10/200], Loss: 0.5727
+Epoch [11/200], Loss: 0.6576
+Epoch [12/200], Loss: 0.7264
+Epoch [13/200], Loss: 0.6440
+Epoch [14/200], Loss: 0.6032
+Epoch [15/200], Loss: 0.5451
+Epoch [16/200], Loss: 0.6052
+Epoch [17/200], Loss: 0.6889
+Epoch [18/200], Loss: 0.4436
+Epoch [19/200], Loss: 0.6238
+Epoch [20/200], Loss: 0.4582
+Epoch [21/200], Loss: 0.4709
+Epoch [22/200], Loss: 0.6344
+Epoch [23/200], Loss: 0.4691
+Epoch [24/200], Loss: 0.5402
+Epoch [25/200], Loss: 0.4032
+Epoch [26/200], Loss: 0.6657
+Epoch [27/200], Loss: 0.8048
+Epoch [28/200], Loss: 0.5984
+Epoch [29/200], Loss: 0.7095
+Epoch [30/200], Loss: 0.5218
+Epoch [31/200], Loss: 0.6468
+Epoch [32/200], Loss: 0.4735
+Epoch [33/200], Loss: 0.5528
+Epoch [34/200], Loss: 0.4933
+Epoch [35/200], Loss: 0.7157
+Epoch [36/200], Loss: 0.4691
+Epoch [37/200], Loss: 0.5105
+Epoch [38/200], Loss: 0.6075
+Epoch [39/200], Loss: 0.4697
+Epoch [40/200], Loss: 0.5075
+Epoch [41/200], Loss: 0.4626
+Epoch [42/200], Loss: 0.3714
+Epoch [43/200], Loss: 0.4110
+Epoch [44/200], Loss: 0.3760
+Epoch [45/200], Loss: 0.5042
+Epoch [46/200], Loss: 0.4278
+Epoch [47/200], Loss: 0.4549
+Epoch [48/200], Loss: 0.4208
+Epoch [49/200], Loss: 0.4400
+Epoch [50/200], Loss: 0.4875
+Epoch [51/200], Loss: 0.4441
+Epoch [52/200], Loss: 0.4124
+Epoch [53/200], Loss: 0.3997
+Epoch [54/200], Loss: 0.4585
+Epoch [55/200], Loss: 0.4028
+Epoch [56/200], Loss: 0.4837
+Epoch [57/200], Loss: 0.4371
+Epoch [58/200], Loss: 0.4063
+Epoch [59/200], Loss: 0.4134
+Epoch [60/200], Loss: 0.4141
+Epoch [61/200], Loss: 0.4893
+Epoch [62/200], Loss: 0.5430
+Epoch [63/200], Loss: 0.4119
+Epoch [64/200], Loss: 0.4217
+Epoch [65/200], Loss: 0.5240
+Epoch [66/200], Loss: 0.5162
+Epoch [67/200], Loss: 0.4302
+Epoch [68/200], Loss: 0.4277
+Epoch [69/200], Loss: 0.4375
+Epoch [70/200], Loss: 0.3922
+Epoch [71/200], Loss: 0.4005
+Epoch [72/200], Loss: 0.5802
+Epoch [73/200], Loss: 0.3588
+Epoch [74/200], Loss: 0.3763
+Epoch [75/200], Loss: 0.5233
+Epoch [76/200], Loss: 0.3558
+Epoch [77/200], Loss: 0.4575
+Epoch [78/200], Loss: 0.4204
+Epoch [79/200], Loss: 0.4876
+Epoch [80/200], Loss: 0.5639
+Epoch [81/200], Loss: 0.4549
+Epoch [82/200], Loss: 0.3855
+Epoch [83/200], Loss: 0.3866
+Epoch [84/200], Loss: 0.4232
+Epoch [85/200], Loss: 0.3926
+Epoch [86/200], Loss: 0.3789
+Epoch [87/200], Loss: 0.4363
+Epoch [88/200], Loss: 0.3976
+Epoch [89/200], Loss: 0.3913
+Epoch [90/200], Loss: 0.3914
+Epoch [91/200], Loss: 0.4316
+Epoch [92/200], Loss: 0.3652
+Epoch [93/200], Loss: 0.3741
+Epoch [94/200], Loss: 0.5309
+Epoch [95/200], Loss: 0.3975
+Epoch [96/200], Loss: 0.4163
+Epoch [97/200], Loss: 0.5295
+Epoch [98/200], Loss: 0.4265
+Epoch [99/200], Loss: 0.4186
+Epoch [100/200], Loss: 0.3558
+Epoch [101/200], Loss: 0.3463
+Epoch [102/200], Loss: 0.4093
+Epoch [103/200], Loss: 0.3947
+Epoch [104/200], Loss: 0.4081
+Epoch [105/200], Loss: 0.3969
+Epoch [106/200], Loss: 0.3859
+Epoch [107/200], Loss: 0.4458
+Epoch [108/200], Loss: 0.3603
+Epoch [109/200], Loss: 0.3565
+Epoch [110/200], Loss: 0.3742
+Epoch [111/200], Loss: 0.4779
+Epoch [112/200], Loss: 0.3641
+Epoch [113/200], Loss: 0.4842
+Epoch [114/200], Loss: 0.3534
+Epoch [115/200], Loss: 0.4704
+Epoch [116/200], Loss: 0.4057
+Epoch [117/200], Loss: 0.4418
+Epoch [118/200], Loss: 0.3626
+Epoch [119/200], Loss: 0.5221
+Epoch [120/200], Loss: 0.4089
+Epoch [121/200], Loss: 0.4177
+Epoch [122/200], Loss: 0.3712
+Epoch [123/200], Loss: 0.4433
+Epoch [124/200], Loss: 0.4642
+Epoch [125/200], Loss: 0.3968
+Epoch [126/200], Loss: 0.4656
+Epoch [127/200], Loss: 0.4157
+Epoch [128/200], Loss: 0.4119
+Epoch [129/200], Loss: 0.4064
+Epoch [130/200], Loss: 0.4179
+Epoch [131/200], Loss: 0.4099
+Epoch [132/200], Loss: 0.3974
+Epoch [133/200], Loss: 0.3648
+Epoch [134/200], Loss: 0.4819
+Epoch [135/200], Loss: 0.4031
+Epoch [136/200], Loss: 0.3968
+Epoch [137/200], Loss: 0.4371
+Epoch [138/200], Loss: 0.4097
+Epoch [139/200], Loss: 0.3897
+Epoch [140/200], Loss: 0.4113
+Epoch [141/200], Loss: 0.3901
+Epoch [142/200], Loss: 0.4401
+Epoch [143/200], Loss: 0.3746
+Epoch [144/200], Loss: 0.3782
+Epoch [145/200], Loss: 0.4165
+Epoch [146/200], Loss: 0.4087
+Epoch [147/200], Loss: 0.4919
+Epoch [148/200], Loss: 0.3704
+Epoch [149/200], Loss: 0.4093
+Epoch [150/200], Loss: 0.3719
+Epoch [151/200], Loss: 0.3469
+Epoch [152/200], Loss: 0.4132
+Epoch [153/200], Loss: 0.3474
+Epoch [154/200], Loss: 0.3615
+Epoch [155/200], Loss: 0.3717
+Epoch [156/200], Loss: 0.3384
+Epoch [157/200], Loss: 0.3462
+Epoch [158/200], Loss: 0.4226
+Epoch [159/200], Loss: 0.3749
+Epoch [160/200], Loss: 0.4756
+Epoch [161/200], Loss: 0.3709
+Epoch [162/200], Loss: 0.4279
+Epoch [163/200], Loss: 0.4474
+Epoch [164/200], Loss: 0.3657
+Epoch [165/200], Loss: 0.3375
+Epoch [166/200], Loss: 0.4636
+Epoch [167/200], Loss: 0.4047
+Epoch [168/200], Loss: 0.3859
+Epoch [169/200], Loss: 0.5443
+Epoch [170/200], Loss: 0.4310
+Epoch [171/200], Loss: 0.4062
+Epoch [172/200], Loss: 0.3740
+Epoch [173/200], Loss: 0.5054
+Epoch [174/200], Loss: 0.4203
+Epoch [175/200], Loss: 0.9967
+Epoch [176/200], Loss: 0.3714
+Epoch [177/200], Loss: 0.4102
+Epoch [178/200], Loss: 0.4765
+Epoch [179/200], Loss: 0.4352
+Epoch [180/200], Loss: 0.3882
+Epoch [181/200], Loss: 0.3911
+Epoch [182/200], Loss: 0.3667
+Epoch [183/200], Loss: 0.4422
+Epoch [184/200], Loss: 0.4369
+Epoch [185/200], Loss: 0.3432
+Epoch [186/200], Loss: 0.4167
+Epoch [187/200], Loss: 0.4096
+Epoch [188/200], Loss: 0.4252
+Epoch [189/200], Loss: 0.3375
+Epoch [190/200], Loss: 0.3538
+Epoch [191/200], Loss: 0.3524
+Epoch [192/200], Loss: 0.4694
+Epoch [193/200], Loss: 0.4108
+Epoch [194/200], Loss: 0.5248
+Epoch [195/200], Loss: 0.3413
+Epoch [196/200], Loss: 0.3572
+Epoch [197/200], Loss: 0.3643
+Epoch [198/200], Loss: 0.3732
+Epoch [199/200], Loss: 0.3559
+Epoch [200/200], Loss: 0.3542
+Train class_to_idx: {'bus_stop_gym': 0, 'bus_stop_xiang_feng': 1, 'ntou_donut': 2, 'ntou_freedom_ship': 3}
+Class bus_stop_gym has 5 samples
+Class bus_stop_xiang_feng has 5 samples
+Class ntou_donut has 6 samples
+Class ntou_freedom_ship has 6 samples
+Support set size: 12 samples
+Query set size: 10 samples
+Query 0: True = bus_stop_gym, Predicted = bus_stop_gym
+Query 1: True = bus_stop_gym, Predicted = bus_stop_gym
+Query 2: True = bus_stop_xiang_feng, Predicted = ntou_freedom_ship
+Query 3: True = bus_stop_xiang_feng, Predicted = bus_stop_xiang_feng
+Query 4: True = ntou_donut, Predicted = ntou_donut
+Query 5: True = ntou_donut, Predicted = ntou_donut
+Query 6: True = ntou_donut, Predicted = bus_stop_gym
+Query 7: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Query 8: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Query 9: True = ntou_freedom_ship, Predicted = ntou_freedom_ship
+Few-shot prototype classification accuracy: 0.80
+Test class_to_idx: {'bus_stop_gym': 0, 'bus_stop_xiang_feng': 1, 'ntou_donut': 2, 'ntou_freedom_ship': 3}
+GT: bus_stop_gym, Pred: bus_stop_gym
+GT: bus_stop_xiang_feng, Pred: bus_stop_xiang_feng
+GT: ntou_donut, Pred: ntou_donut
+GT: ntou_freedom_ship, Pred: ntou_freedom_ship
+Test accuracy: 1.00
+
+[AutoEval] Running experiments for few_shot_k = 1 to 5
+
+[AutoEval] --- Testing few_shot_k = 1 ---
+→ Train acc = 0.61, Test acc = 0.50
+
+[AutoEval] --- Testing few_shot_k = 2 ---
+→ Train acc = 0.71, Test acc = 0.75
+
+[AutoEval] --- Testing few_shot_k = 3 ---
+→ Train acc = 0.80, Test acc = 0.75
+
+[AutoEval] --- Testing few_shot_k = 4 ---
+→ Train acc = 0.83, Test acc = 1.00
+
+[AutoEval] --- Testing few_shot_k = 5 ---
+→ Train acc = 1.00, Test acc = 1.00
