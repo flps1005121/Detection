@@ -9,11 +9,11 @@ output_file = "stability_analysis.csv"
 
 # 檔案名稱與 lr、epochs、round 的映射表
 file_mapping = {
-    "epoch_log_1.txt": {"lr": "3e-4", "epochs": 200, "round": 1},
-    "epoch_log_2.txt": {"lr": "3e-4", "epochs": 200, "round": 2},
-    "epoch_log_3.txt": {"lr": "3e-4", "epochs": 200, "round": 3},
-    "epoch_log_4.txt": {"lr": "3e-4", "epochs": 200, "round": 4},
-    "epoch_log_5.txt": {"lr": "3e-4", "epochs": 200, "round": 5},
+    "epoch_log_1.txt": {"lr": "2e-4", "epochs": 200, "round": 1},
+    "epoch_log_2.txt": {"lr": "2e-4", "epochs": 200, "round": 2},
+    "epoch_log_3.txt": {"lr": "2e-4", "epochs": 200, "round": 3},
+    "epoch_log_4.txt": {"lr": "2e-4", "epochs": 200, "round": 4},
+    "epoch_log_5.txt": {"lr": "2e-4", "epochs": 200, "round": 5},
 }
 
 # 確保資料夾存在

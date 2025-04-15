@@ -64,7 +64,6 @@ contrast_transforms = T.Compose([
 
 train_dataset = SimCLRDataset(root=data_dir, transform=contrast_transforms)
 data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-print(f"Total training samples: {len(train_dataset)}")
 log_print(f"Total training samples: {len(train_dataset)}")
 
 # ------------------------
@@ -128,7 +127,6 @@ for epoch in range(num_epochs):
     #scheduler.step()
     avg_loss = total_loss / len(data_loader)
     losses.append(avg_loss)
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(data_loader):.4f}")
     log_print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(data_loader):.4f}")
 
 # 繪製 Loss 圖
@@ -152,7 +150,6 @@ infer_transform = T.Compose([
 infer_dataset = ImageFolder(root=data_dir, transform=infer_transform)
 class_to_idx = infer_dataset.class_to_idx
 idx_to_class = {v: k for k, v in class_to_idx.items()}
-print("Train class_to_idx:", class_to_idx)
 log_print("Train class_to_idx:", class_to_idx)
 
 # Collect embeddings for prototype per class
@@ -167,7 +164,7 @@ support_embeddings, support_labels = [], []
 query_embeddings, query_labels = [], []
 
 for class_id, embeddings in class_to_embeddings.items():
-    print(f"Class {idx_to_class[class_id]} has {len(embeddings)} samples")
+    log_print(f"Class {idx_to_class[class_id]} has {len(embeddings)} samples")
     random.shuffle(embeddings)
     support_embs = embeddings[:few_shot_k]  # 前 few_shot_k 張作為 support
     query_embs = embeddings[few_shot_k:]    # 剩餘作為 query
@@ -178,17 +175,14 @@ for class_id, embeddings in class_to_embeddings.items():
 
 support_embeddings = torch.stack(support_embeddings)
 support_labels = np.array(support_labels)
-print(f"Support set size: {len(support_labels)} samples")
 log_print(f"Support set size: {len(support_labels)} samples")
 
 
 if query_embeddings:
     query_embeddings = torch.stack(query_embeddings)
     query_labels = np.array(query_labels)
-    print(f"Query set size: {len(query_labels)} samples")
     log_print(f"Query set size: {len(query_labels)} samples")
 else:
-    print("Warning: Query set is empty.")
     log_print("Warning: Query set is empty.")
     exit()
 
@@ -201,11 +195,9 @@ for i, q in enumerate(query_embeddings):
     dists = torch.norm(support_prototypes - q, dim=1)
     pred_class = torch.argmin(dists).item()
     preds.append(pred_class)
-    print(f"Query {i}: True = {idx_to_class[query_labels[i]]}, Predicted = {idx_to_class[pred_class]}")
     log_print(f"Query {i}: True = {idx_to_class[query_labels[i]]}, Predicted = {idx_to_class[pred_class]}")
 
 acc = np.mean(np.array(preds) == query_labels)
-print(f"Few-shot prototype classification accuracy: {acc:.2f}")
 log_print(f"Few-shot prototype classification accuracy: {acc:.2f}")
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -237,7 +229,7 @@ plt.show()
 if os.path.exists(test_dir) and os.listdir(test_dir):
     test_dataset = ImageFolder(root=test_dir, transform=infer_transform)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-    print("Test class_to_idx:", test_dataset.class_to_idx)
+    log_print("Test class_to_idx:", test_dataset.class_to_idx)
 
     correct, total = 0, 0
     with torch.no_grad():
@@ -245,14 +237,11 @@ if os.path.exists(test_dir) and os.listdir(test_dir):
             emb = model(x.to(device)).squeeze(0).cpu()
             dists = torch.norm(support_prototypes - emb, dim=1)
             pred_class = torch.argmin(dists).item()
-            print(f"GT: {idx_to_class.get(label.item(), 'unknown')}, Pred: {idx_to_class[pred_class]}")
             log_print(f"GT: {idx_to_class.get(label.item(), 'unknown')}, Pred: {idx_to_class[pred_class]}")
             correct += (pred_class == label.item())
             total += 1
-    print(f"Test accuracy: {correct / total:.2f}")
     log_print(f"Test accuracy: {correct / total:.2f}")
 else:
-    print(f"Test directory '{test_dir}' not found or empty.")
     log_print(f"Test directory '{test_dir}' not found or empty.")
 
 
@@ -264,11 +253,9 @@ max_k = min(len(v) for v in class_to_embeddings.values())  # 最小類別圖片�
 with open("results_log.txt", "w") as f:
     f.write("few_shot_k, Train acc, Test acc\n")
 
-print(f"\n[AutoEval] Running experiments for few_shot_k = 1 to {max_k}")
 log_print(f"\n[AutoEval] Running experiments for few_shot_k = 1 to {max_k}")
 
 for k in range(1, max_k + 1):
-    print(f"\n[AutoEval] --- Testing few_shot_k = {k} ---")
     log_print(f"\n[AutoEval] --- Testing few_shot_k = {k} ---")
     support_embeddings, support_labels = [], []
     query_embeddings, query_labels = [], []
@@ -311,7 +298,6 @@ for k in range(1, max_k + 1):
             total += 1
     test_acc = correct / total
 
-    print(f"→ Train acc = {train_acc:.2f}, Test acc = {test_acc:.2f}")
     log_print(f"→ Train acc = {train_acc:.2f}, Test acc = {test_acc:.2f}")
 
     with open("results_log.txt", "a") as f:
