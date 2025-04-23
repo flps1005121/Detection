@@ -1,2 +1,0 @@
-Total training samples: 22
-Epoch [1/200], Loss: 1.2026
