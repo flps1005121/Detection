@@ -29,7 +29,7 @@ def log_print(*args, **kwargs):
     with open(log_file, 'a', encoding='utf-8') as f:
         f.write(message + '\n')
 
-# 資料集定義
+# 自定義資料集，回傳兩個不同增強版本的同一張圖片（SimCLR用）
 class SimCLRDataset(ImageFolder):
     def __init__(self, root, transform):
         super().__init__(root=root)
@@ -38,8 +38,8 @@ class SimCLRDataset(ImageFolder):
     def __getitem__(self, index):
         path, label = self.samples[index]
         image = self.loader(path)
-        x1 = self.transform(image)
-        x2 = self.transform(image)
+        x1 = self.transform(image)  # 第一次增強
+        x2 = self.transform(image)  # 第二次增強
         return x1, x2, label
 
 contrast_transforms = T.Compose([
@@ -61,19 +61,36 @@ class SimCLRNet(nn.Module):
     def __init__(self, base_encoder, feature_dim):
         super().__init__()
         self.encoder = base_encoder
+        dummy = torch.randn(1, 3, 224, 224)
+        with torch.no_grad():
+            out = self.encoder(dummy)
+        self.output_dim = out.shape[1]
         self.projector = nn.Sequential(
-            nn.Linear(1280, 512),
-            nn.ReLU(),
-            nn.Linear(512, feature_dim)
+            nn.Linear(self.output_dim, 512),  # 第一層全連接層
+            nn.BatchNorm1d(512),             # 批次正規化，穩定訓練
+            nn.ReLU(),                       # 激活函數
+            nn.Dropout(0.2),                 # Dropout 防止過擬合
+            nn.Linear(512, 512),             # 第二層全連接層
+            nn.BatchNorm1d(512),             # 批次正規化
+            nn.ReLU(),                       # 激活函數
+            nn.Dropout(0.2),                 # Dropout
+            nn.Linear(512, feature_dim)      # 最終映射到指定特徵維度
         )
 
     def forward(self, x):
-        h = self.encoder(x)
-        h = F.adaptive_avg_pool2d(h, (1, 1))
-        h = h.view(h.size(0), -1)
-        z = self.projector(h)
-        return F.normalize(z, dim=1)
+        h = self.encoder(x)  # 提取 feature map
+        h = F.adaptive_avg_pool2d(h, (1, 1))  # 全域平均池化
+        h = h.view(h.size(0), -1)  # 展平
+        z = self.projector(h)  # 投影到低維度空間
+        return F.normalize(z, dim=1)  # 單位向量化，方便算 cosine similarity
 
+def get_model():
+    """返回用於訓練的 SimCLRNet 模型"""
+    mobilenet = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+    mobilenet.classifier = nn.Identity()
+    return SimCLRNet(mobilenet.features, feature_dim).to(device)
+
+# 特徵提取器，支援預處理、模型加載、特徵儲存與搜尋
 class ImageFeatureExtractor:
     def __init__(self, model_path='self_supervised_mobilenetv3.pth', device=None):
         if device is None:
@@ -84,6 +101,7 @@ class ImageFeatureExtractor:
         log_print(f"Using device: {self.device}")
 
         # 創建模型並載入預訓練權重
+        # MobileNetV3 去掉 classifier 後使用 features 作為 backbone
         mobilenet = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
         mobilenet.classifier = nn.Identity()
         self.model = SimCLRNet(mobilenet.features, feature_dim).to(self.device)
@@ -106,7 +124,7 @@ class ImageFeatureExtractor:
         ])
 
     def extract_features(self, image_path):
-        """從圖像路徑提取特徵向量"""
+        """從圖像路徑提取特徵向量，回傳一張圖的特徵向量（flatten）"""
         try:
             image = Image.open(image_path).convert('RGB')
             image_tensor = self.transform(image).unsqueeze(0).to(self.device)
@@ -121,7 +139,7 @@ class ImageFeatureExtractor:
             return None
 
     def create_features_database(self, train_dir, cache_file='train_features.npz', force_refresh=True):
-        """為訓練集中所有圖像創建特徵資料庫"""
+        """為訓練集中所有圖像創建特徵資料庫，把訓練集每張圖都跑過 extract_features，儲存起來作為搜尋資料庫"""
         if not os.path.exists(train_dir):
             print(f"錯誤：指定的目錄 {train_dir} 不存在")
             return [], []
@@ -158,7 +176,7 @@ class ImageFeatureExtractor:
         return features, valid_file_paths
 
     def find_similar_images(self, query_img_path, features, file_paths, top_k=5):
-        """尋找與查詢圖像最相似的訓練圖像"""
+        """尋找與查詢圖像最相似的訓練圖像，用 cosine similarity 找出最相近的圖像"""
         query_feature = self.extract_features(query_img_path)
 
         if query_feature is None:

@@ -73,8 +73,8 @@ class SelfSupervisedModel(nn.Module):
         self.backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
 
         # 凍結 backbone 參數（這邊是可選的）
-        for param in self.backbone.parameters():
-            param.requires_grad = False
+        #for param in self.backbone.parameters():
+        #    param.requires_grad = False
 
         feature_dim = self.backbone.classifier[0].in_features
         self.backbone.classifier = nn.Identity()
@@ -103,37 +103,59 @@ class NTXentLoss(nn.Module):
 
 
 # 自監督訓練函數
-def train_self_supervised(model, data_loader, optimizer, criterion, device, epochs, save_path=None):
+def train_self_supervised(model, data_loader, optimizer, criterion, device, epochs, save_path):
     losses = []
+    best_loss = float("inf")
+    patience = 10
+    counter = 0
+
+    log_print(f"開始訓練，使用設備: {device}")
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
-        for x1, x2, _ in data_loader:
+
+        for x1, x2 in data_loader:
             # 獲取兩種增強版本的圖像
             x1, x2 = x1.to(device), x2.to(device)
-            z1, z2 = model(x1), model(x2)
+            # 前向傳播
+            z1, z2 = model(x1, x2)
+            # 計算損失
             loss = criterion(z1, z2)
+
+            # 反向傳播
             optimizer.zero_grad()
-            # 計算損失並反向傳播
             loss.backward()
             optimizer.step()
+
             running_loss += loss.item()
+
         # 記錄每個 epoch 的損失
         epoch_loss = running_loss / len(data_loader)
         losses.append(epoch_loss)
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
+        log_print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
-        # 每 5 個 epoch 儲存一次損失記錄或最後一個 epoch
+        # 早停檢查
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            counter = 0
+            # 可選：儲存最佳模型
+            torch.save(model.state_dict(), os.path.join(OUTPUT_DIR, "best_model.pth"))
+            log_print(f"儲存最佳模型至: {os.path.join(OUTPUT_DIR, 'best_model.pth')}")
+        else:
+            counter += 1
+            if counter >= patience:
+                print(f"Early stopping！在第 {epoch+1} epoch 模型不再進步")
+                break
+
+        # 每 2 個 epoch 儲存一次損失記錄
         if save_path and (epoch % 2 == 0 or epoch == epochs - 1):
             with open(save_path, 'w') as f:
                 json.dump(losses, f)
             print(f"損失記錄已儲存至: {save_path}")
 
-    # 訓練結束後儲存最終損失記錄
-    if save_path:
-        with open(save_path, 'w') as f:
-            json.dump(losses, f)
-        print(f"最終損失記錄已儲存至: {save_path}")
+    # 保存最終模型
+    torch.save(model.state_dict(), MODEL_SAVE_PATH)
+    log_print(f"最終模型已儲存至: {MODEL_SAVE_PATH}")
 
     return losses
 
@@ -160,7 +182,7 @@ def main():
         os.makedirs(OUTPUT_DIR)
 
     # 開始訓練
-    print("開始訓練...")
+    log_print("開始訓練...")
     losses = train_self_supervised(model, dataloader, optimizer, criterion, device, epochs=EPOCHS, save_path=LOSSES_FILE)
 
     # 儲存模型

@@ -17,7 +17,7 @@ def predict_and_display(extractor, test_dir, train_dir, top_k=5, force_refresh=F
         train_dir, cache_file='train_features.npz', force_refresh=force_refresh
     )
 
-    if len(train_features) == 0:
+    if not train_features:
         log_print("無法繼續：訓練集特徵資料庫為空")
         return
 
@@ -27,7 +27,7 @@ def predict_and_display(extractor, test_dir, train_dir, top_k=5, force_refresh=F
                    f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))]
 
     if not test_images:
-        log_print("警告：在測試目錄 {test_dir} 中未找到任何圖像")
+        log_print(f"警告：在測試目錄 {test_dir} 中未找到任何圖像")
         return []
 
     log_print(f"開始預測 {len(test_images)} 張測試圖像...")
@@ -122,7 +122,7 @@ def evaluate_few_shot(few_shot_k=3, model=None, model_path='self_supervised_mobi
 
     # 計算原型
     support_prototypes = torch.stack([
-        support_embeddings[support_labels == c].mean(dim=0)
+        support_embeddings[torch.tensor(support_labels) == c].mean(dim=0)
         for c in range(len(class_to_idx))
     ])
 
