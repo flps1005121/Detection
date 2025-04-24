@@ -21,7 +21,7 @@ LEARNING_RATE = 0.001
 TEMPERATURE = 0.07
 EPOCHS = 10
 LOSSES_FILE = "training_losses.json"
-MODEL_SAVE_PATH = "self_supervised_mobilenetv3.pth"
+MODEL_SAVE_PATH = "simclr_mobilenetv3.pth"
 OUTPUT_DIR = "visualizations"
 FEATURE_DIM = 128
 
@@ -76,10 +76,6 @@ class SimCLRNet(nn.Module):
         z = self.projector(h)
         return F.normalize(z, dim=1)
 
-# 獲取模型
-def get_model():
-    return SimCLRNet(feature_dim=FEATURE_DIM)
-
 # 對比學習損失函數
 class NTXentLoss(nn.Module):
     def __init__(self, temperature=0.5):
@@ -118,7 +114,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
         print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
         # 每 2 個 epoch 儲存一次損失記錄或最後一個 epoch
-        if save_path and (epoch % 2 == 0 or epoch == epochs - 1):
+        if save_path:
             with open(save_path, 'w') as f:
                 json.dump(losses, f)
             print(f"損失記錄已儲存至: {save_path}")
@@ -141,7 +137,7 @@ def main():
     print(f"數據集大小: {len(dataset)}")
     
     # 初始化模型、優化器與損失函數
-    model = get_model().to(device)
+    model = SimCLRNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = NTXentLoss(temperature=TEMPERATURE)
 
