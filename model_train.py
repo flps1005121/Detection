@@ -33,7 +33,7 @@ class SimCLRDataset(Dataset):
     def __init__(self, root_dir, transform):
         self.dataset = ImageFolder(root=root_dir, transform=None)
         self.transform = transform
-        
+
     def __len__(self):
         return len(self.dataset)
 
@@ -60,12 +60,19 @@ class SimCLRNet(nn.Module):
         # 使用 MobileNetV3 Small 作為基礎模型
         self.backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
         self.backbone.classifier = nn.Identity()
-        
+
         self.projector = nn.Sequential(
-            nn.Linear(576, 512),
-            nn.ReLU(),
-            nn.Linear(512, feature_dim)
+            nn.Linear(576, 512),             # 第一層全連接層
+            nn.BatchNorm1d(512),             # 批次正規化，穩定訓練
+            nn.ReLU(),                       # 激活函數
+            nn.Dropout(0.2),                 # Dropout 防止過擬合
+            nn.Linear(512, 512),             # 第二層全連接層
+            nn.BatchNorm1d(512),             # 批次正規化
+            nn.ReLU(),                       # 激活函數
+            nn.Dropout(0.2),                 # Dropout
+            nn.Linear(512, feature_dim)      # 最終映射到指定特徵維度
         )
+
 
     def forward(self, x):
         h = self.backbone.features(x)
@@ -95,6 +102,10 @@ class NTXentLoss(nn.Module):
 # 自監督訓練函數
 def train_self_supervised(model, data_loader, optimizer, criterion, device, epochs, save_path=None):
     losses = []
+    best_loss = float("inf")
+    patience = 10
+    counter = 0
+
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
@@ -113,6 +124,19 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
         losses.append(epoch_loss)
         print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
+        # 早停檢查
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            counter = 0
+            # 可選：儲存最佳模型
+            torch.save(model.state_dict(), os.path.join(OUTPUT_DIR, "best_model.pth"))
+            print(f"儲存最佳模型至: {os.path.join(OUTPUT_DIR, 'best_model.pth')}")
+        else:
+            counter += 1
+            if counter >= patience:
+                print(f"Early stopping！在第 {epoch+1} epoch 模型不再進步")
+                break
+
         # 每 2 個 epoch 儲存一次損失記錄或最後一個 epoch
         if save_path:
             with open(save_path, 'w') as f:
@@ -130,12 +154,12 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
 # 主函數
 def main():
     print(f"使用設備: {device}")
-    
+
     # 加載數據集
     dataset = SimCLRDataset(root_dir=DATA_DIR, transform=contrast_transforms)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     print(f"數據集大小: {len(dataset)}")
-    
+
     # 初始化模型、優化器與損失函數
     model = SimCLRNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
