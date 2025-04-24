@@ -1,211 +1,161 @@
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as T
-import torchvision.models as models
+import torch.optim as optim
+import torchvision.transforms as transforms
+from torchvision import transforms, models
 from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from PIL import Image
+import os
 import numpy as np
+import matplotlib.pyplot as plt
+import json
 from tqdm import tqdm
 
-# Configuration
+# 超參數設定
+DATA_DIR = "dataset/train"
+BATCH_SIZE = 4
+NUM_WORKERS = 2
+LEARNING_RATE = 0.001
+TEMPERATURE = 0.07
+EPOCHS = 100
+LOSSES_FILE = "training_losses.json"
+MODEL_SAVE_PATH = "self_supervised_mobilenetv3.pth"
+OUTPUT_DIR = "visualizations"
+FEATURE_DIM = 128
+
+# 設置設備
 device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 4
-feature_dim = 128
-data_dir = "dataset/train"
-test_dir = "dataset/test"
 
-# Logging utility
-log_file = "log.txt"
-if not os.path.exists(log_file):
-    with open(log_file, 'w', encoding='utf-8') as f:
-        f.write("")  # 初始化 log file
-
-def log_print(*args, **kwargs):
-    message = ' '.join(map(str, args))
-    print(message, **kwargs)
-    with open(log_file, 'a', encoding='utf-8') as f:
-        f.write(message + '\n')
-
-# 自定義資料集，回傳兩個不同增強版本的同一張圖片（SimCLR用）
-class SimCLRDataset(ImageFolder):
-    def __init__(self, root, transform):
-        super().__init__(root=root)
+# 資料集定義
+class SimCLRDataset(Dataset):
+    def __init__(self, root_dir, transform):
+        self.dataset = ImageFolder(root=root_dir, transform=None)
         self.transform = transform
 
+    def __len__(self):
+        return len(self.dataset)
+
     def __getitem__(self, index):
-        path, label = self.samples[index]
-        image = self.loader(path)
-        x1 = self.transform(image)  # 第一次增強
-        x2 = self.transform(image)  # 第二次增強
+        image, label = self.dataset[index]
+        x1 = self.transform(image)
+        x2 = self.transform(image)
         return x1, x2, label
 
-contrast_transforms = T.Compose([
-    T.RandomResizedCrop(224),
-    T.RandomHorizontalFlip(),
-    T.ColorJitter(0.5, 0.5, 0.5, 0.1),
-    T.RandomGrayscale(p=0.2),
-    T.ToTensor(),
-    T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+# 定義數據增強
+contrast_transforms = transforms.Compose([
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(0.5, 0.5, 0.5, 0.1),
+    transforms.RandomGrayscale(p=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
-train_dataset = SimCLRDataset(root=data_dir, transform=contrast_transforms)
-data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-log_print(f"Total training samples: {len(train_dataset)}")
-
-
-# SimCLR 模型定義
+# 自監督學習模型
 class SimCLRNet(nn.Module):
-    def __init__(self, base_encoder, feature_dim):
+    def __init__(self, feature_dim=FEATURE_DIM):
         super().__init__()
-        self.encoder = base_encoder
-        dummy = torch.randn(1, 3, 224, 224)
-        with torch.no_grad():
-            out = self.encoder(dummy)
-        self.output_dim = out.shape[1]
+        # 使用 MobileNetV3 Small 作為基礎模型
+        self.backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
+        self.backbone.classifier = nn.Identity()
+
         self.projector = nn.Sequential(
-            nn.Linear(self.output_dim, 512),  # 第一層全連接層
-            nn.BatchNorm1d(512),             # 批次正規化，穩定訓練
-            nn.ReLU(),                       # 激活函數
-            nn.Dropout(0.2),                 # Dropout 防止過擬合
-            nn.Linear(512, 512),             # 第二層全連接層
-            nn.BatchNorm1d(512),             # 批次正規化
-            nn.ReLU(),                       # 激活函數
-            nn.Dropout(0.2),                 # Dropout
-            nn.Linear(512, feature_dim)      # 最終映射到指定特徵維度
+            nn.Linear(576, 512),
+            nn.ReLU(),
+            nn.Linear(512, feature_dim)
         )
 
     def forward(self, x):
-        h = self.encoder(x)  # 提取 feature map
-        h = F.adaptive_avg_pool2d(h, (1, 1))  # 全域平均池化
-        h = h.view(h.size(0), -1)  # 展平
-        z = self.projector(h)  # 投影到低維度空間
-        return F.normalize(z, dim=1)  # 單位向量化，方便算 cosine similarity
+        h = self.backbone.features(x)
+        h = F.adaptive_avg_pool2d(h, (1, 1))
+        h = h.view(h.size(0), -1)
+        # 添加特徵維度調試資訊 (第一次執行時可以取消這行的註解來檢查維度)
+        # print(f"Feature shape: {h.shape}")
+        z = self.projector(h)
+        return F.normalize(z, dim=1)
 
+# 獲取模型
 def get_model():
-    """返回用於訓練的 SimCLRNet 模型"""
-    mobilenet = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-    mobilenet.classifier = nn.Identity()
-    return SimCLRNet(mobilenet.features, feature_dim).to(device)
+    return SimCLRNet(feature_dim=FEATURE_DIM)
 
-# 特徵提取器，支援預處理、模型加載、特徵儲存與搜尋
-class ImageFeatureExtractor:
-    def __init__(self, model_path='self_supervised_mobilenetv3.pth', device=None):
-        if device is None:
-            self.device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = device
+# 對比學習損失函數
+class NTXentLoss(nn.Module):
+    def __init__(self, temperature=0.5):
+        super().__init__()
+        self.temperature = temperature
 
-        log_print(f"Using device: {self.device}")
+    def forward(self, z1, z2):
+        z = torch.cat([z1, z2], dim=0)
+        N = z1.size(0)
+        sim = F.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
+        sim = sim / self.temperature
+        mask = ~torch.eye(2 * N, dtype=bool).to(device)
+        sim = sim.masked_fill(~mask, -9e15)
+        labels = torch.cat([torch.arange(N) + N, torch.arange(N)]).to(device)
+        return F.cross_entropy(sim, labels)
 
-        # 創建模型並載入預訓練權重
-        # MobileNetV3 去掉 classifier 後使用 features 作為 backbone
-        mobilenet = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-        mobilenet.classifier = nn.Identity()
-        self.model = SimCLRNet(mobilenet.features, feature_dim).to(self.device)
+# 自監督訓練函數
+def train_self_supervised(model, data_loader, optimizer, criterion, device, epochs, save_path=None):
+    losses = []
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        for x1, x2, _ in tqdm(data_loader, desc=f"Epoch {epoch+1}/{epochs}"):
+            # 獲取兩種增強版本的圖像
+            x1, x2 = x1.to(device), x2.to(device)
+            z1, z2 = model(x1), model(x2)
+            loss = criterion(z1, z2)
+            optimizer.zero_grad()
+            # 計算損失並反向傳播
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        # 記錄每個 epoch 的損失
+        epoch_loss = running_loss / len(data_loader)
+        losses.append(epoch_loss)
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
-        # 嘗試載入模型權重
-        try:
-            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
-            log_print(f"成功載入模型權重 {model_path}")
-        except Exception as e:
-            log_print(f"載入模型權重失敗: {e}")
-            log_print("將使用未訓練的模型進行特徵提取")
+        # 每 2 個 epoch 儲存一次損失記錄或最後一個 epoch
+        if save_path and (epoch % 2 == 0 or epoch == epochs - 1):
+            with open(save_path, 'w') as f:
+                json.dump(losses, f)
+            print(f"損失記錄已儲存至: {save_path}")
 
-        self.model.eval()
+    # 訓練結束後儲存最終損失記錄
+    if save_path:
+        with open(save_path, 'w') as f:
+            json.dump(losses, f)
+        print(f"最終損失記錄已儲存至: {save_path}")
 
-        # 圖像預處理
-        self.transform = T.Compose([
-            T.Resize((224, 224)),
-            T.ToTensor(),
-            T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
+    return losses
 
-    def extract_features(self, image_path):
-        """從圖像路徑提取特徵向量，回傳一張圖的特徵向量（flatten）"""
-        try:
-            image = Image.open(image_path).convert('RGB')
-            image_tensor = self.transform(image).unsqueeze(0).to(self.device)
+# 主函數
+def main():
+    print(f"使用設備: {device}")
 
-            with torch.no_grad():
-                # 使用模型的backbone提取特徵
-                features = self.model(image_tensor)
+    # 加載數據集
+    dataset = SimCLRDataset(root_dir=DATA_DIR, transform=contrast_transforms)
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+    print(f"數據集大小: {len(dataset)}")
 
-            return features.cpu().numpy().flatten()
-        except Exception as e:
-            log_print(f"處理圖片 {image_path} 時發生錯誤: {e}")
-            return None
+    # 初始化模型、優化器與損失函數
+    model = get_model().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    criterion = NTXentLoss(temperature=TEMPERATURE)
 
-    def create_features_database(self, train_dir, cache_file='train_features.npz', force_refresh=True):
-        """為訓練集中所有圖像創建特徵資料庫，把訓練集每張圖都跑過 extract_features，儲存起來作為搜尋資料庫"""
-        if not os.path.exists(train_dir):
-            print(f"錯誤：指定的目錄 {train_dir} 不存在")
-            return [], []
+    # 確保輸出目錄存在
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
 
-        image_files = [os.path.join(train_dir, f) for f in os.listdir(train_dir)
-                       if os.path.isfile(os.path.join(train_dir, f)) and
-                       f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))]
+    # 開始訓練
+    print("開始訓練...")
+    losses = train_self_supervised(model, dataloader, optimizer, criterion, device, epochs=EPOCHS, save_path=LOSSES_FILE)
 
-        if not image_files:
-            log_print(f"警告：在目錄 {train_dir} 中未找到任何圖像檔案")
-            return [], []
+    # 儲存模型
+    torch.save(model.state_dict(), MODEL_SAVE_PATH)
+    print("訓練完成！模型已儲存")
 
-        log_print(f"正在為 {len(image_files)} 張訓練圖像提取特徵...")
-        features = []
-        valid_file_paths = []
-
-        for img_path in tqdm(image_files):
-            feature = self.extract_features(img_path)
-            if feature is not None:
-                features.append(feature)
-                valid_file_paths.append(img_path)
-
-        if not features:
-            log_print("警告：沒有成功從任何圖像中提取特徵")
-            return [], []
-
-        try:
-            # 保存特徵資料庫
-            np.savez(cache_file, features=np.array(features), file_paths=np.array(valid_file_paths))
-            log_print(f"特徵資料庫已儲存到 {os.path.abspath(cache_file)}")
-        except Exception as e:
-            log_print(f"儲存特徵資料庫時發生錯誤: {e}")
-
-        return features, valid_file_paths
-
-    def find_similar_images(self, query_img_path, features, file_paths, top_k=5):
-        """尋找與查詢圖像最相似的訓練圖像，用 cosine similarity 找出最相近的圖像"""
-        query_feature = self.extract_features(query_img_path)
-
-        if query_feature is None:
-            return []
-
-        # 計算餘弦相似度
-        similarities = []
-        for idx, feat in enumerate(features):
-            sim = np.dot(query_feature, feat) / (np.linalg.norm(query_feature) * np.linalg.norm(feat))
-            similarities.append((file_paths[idx], sim))
-
-        # 根據相似度排序
-        similarities.sort(key=lambda x: x[1], reverse=True)
-
-        return similarities[:top_k]
-
-# 保留直接執行特徵提取的程式碼以供測試
 if __name__ == "__main__":
-    train_dir = 'dataset/train'  # 訓練圖像資料夾路徑
-    model_path = 'self_supervised_mobilenetv3.pth'  # 模型權重檔案路徑
-    cache_file = 'train_features.npz'  # 特徵資料庫儲存路徑
-
-    print("初始化特徵提取器...")
-    extractor = ImageFeatureExtractor(model_path=model_path)
-
-    print(f"\n開始從 {train_dir} 提取特徵...")
-    features, file_paths = extractor.create_features_database(
-        train_dir=train_dir,
-        cache_file=cache_file,
-        force_refresh=True
-    )
-    print(f"\n成功提取了 {len(features)} 張圖像的特徵")
+    main()

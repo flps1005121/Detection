@@ -91,15 +91,19 @@ class NTXentLoss(nn.Module):
         super().__init__()
         self.temperature = temperature
 
-    def forward(self, z1, z2):
-        z = torch.cat([z1, z2], dim=0)
-        N = z1.size(0)
-        sim = F.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
-        sim = sim / self.temperature
-        mask = ~torch.eye(2 * N, dtype=bool).to(device)
-        sim = sim.masked_fill(~mask, -9e15)
-        labels = torch.cat([torch.arange(N) + N, torch.arange(N)]).to(device)
-        return F.cross_entropy(sim, labels)
+    def forward(self, z_i, z_j):
+        # 歸一化嵌入向量
+        z_i, z_j = nn.functional.normalize(z_i, dim=1), nn.functional.normalize(z_j, dim=1)
+        representations = torch.cat([z_i, z_j], dim=0)
+        sim_matrix = torch.matmul(representations, representations.t()) / self.temperature
+        mask = torch.eye(sim_matrix.size(0), dtype=torch.bool, device=z_i.device)
+        pos_mask = torch.cat([torch.arange(len(z_i), device=z_i.device),
+                            torch.arange(len(z_i), device=z_i.device)])
+        positives = sim_matrix[torch.arange(len(pos_mask)), pos_mask]
+        negatives = sim_matrix[~mask].view(len(pos_mask), -1)
+        logits = torch.cat([positives.unsqueeze(1), negatives], dim=1)
+        # 計算交叉熵損失
+        return nn.CrossEntropyLoss()(logits, torch.zeros(len(pos_mask), dtype=torch.long, device=z_i.device))
 
 
 # 自監督訓練函數
@@ -162,18 +166,17 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
 # 主函數
 def main():
     # 設置設備
-    global device
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用設備: {device}")
     # 設置數據路徑與增強
     data_dir = DATA_DIR
     transform = ContrastiveTransformations()
     # 加載數據集
-    dataset = SimCLRDataset(root_dir=DATA_DIR, transform=contrast_transforms)
+    dataset = SelfSupervisedDataset(root_dir=DATA_DIR, transform=contrast_transforms)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
     print(f"數據集大小: {len(dataset)}")
     # 初始化模型、優化器與損失函數
-    model = get_model().to(device)
+    model = SelfSupervisedModel().to(device)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     criterion = NTXentLoss(temperature=TEMPERATURE)
 
