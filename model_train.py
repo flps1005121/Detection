@@ -10,7 +10,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import json
-from feature_extractor import get_model, SimCLRDataset, contrast_transforms, log_print, device
+from feature_extractor import get_model, SimCLRDataset, contrast_transforms, print, device
 
 # 超參數設定
 DATA_DIR = "dataset/train"
@@ -113,7 +113,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
     patience = 10
     counter = 0
 
-    log_print(f"開始訓練，使用設備: {device}")
+    print(f"開始訓練，使用設備: {device}")
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
@@ -136,7 +136,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
         # 記錄每個 epoch 的損失
         epoch_loss = running_loss / len(data_loader)
         losses.append(epoch_loss)
-        log_print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
         # 早停檢查
         if epoch_loss < best_loss:
@@ -144,7 +144,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
             counter = 0
             # 可選：儲存最佳模型
             torch.save(model.state_dict(), os.path.join(OUTPUT_DIR, "best_model.pth"))
-            log_print(f"儲存最佳模型至: {os.path.join(OUTPUT_DIR, 'best_model.pth')}")
+            print(f"儲存最佳模型至: {os.path.join(OUTPUT_DIR, 'best_model.pth')}")
         else:
             counter += 1
             if counter >= patience:
@@ -159,7 +159,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
 
     # 保存最終模型
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
-    log_print(f"最終模型已儲存至: {MODEL_SAVE_PATH}")
+    print(f"最終模型已儲存至: {MODEL_SAVE_PATH}")
 
     return losses
 
@@ -185,7 +185,7 @@ def main():
         os.makedirs(OUTPUT_DIR)
 
     # 開始訓練
-    log_print("開始訓練...")
+    print("開始訓練...")
     losses = train_self_supervised(model, dataloader, optimizer, criterion, device, epochs=EPOCHS, save_path=LOSSES_FILE)
 
     # 儲存模型
