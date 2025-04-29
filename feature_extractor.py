@@ -10,10 +10,7 @@ import numpy as np
 from tqdm import tqdm
 import sqlite3  # 新增SQLite模組
 # 從model_train導入必要的功能
-from model_train import SimCLRNet, MODEL_SAVE_PATH
-
-# 設置設備
-device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+from model_train import SimCLRNet, MODEL_SAVE_PATH, device
 
 # 定義推論用的圖像轉換
 infer_transform = transforms.Compose([
@@ -218,7 +215,7 @@ class ImageFeatureExtractor:
 def main():
     print(f"使用設備: {device}")
     
-    # 修改 - 特徵提取測試並使用SQLite儲存
+    # 特徵提取測試並使用SQLite儲存
     print("\n開始測試特徵提取功能...")
     extractor = ImageFeatureExtractor(model_path=MODEL_SAVE_PATH)
     features, file_paths, labels = extractor.create_features_database(
