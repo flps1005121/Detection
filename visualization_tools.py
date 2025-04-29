@@ -9,6 +9,7 @@ import json
 from PIL import Image
 from torchvision import transforms, models
 from feature_extractor import SimCLRNet, log_print, device
+import umap
 
 # 設定支援中文字體
 import matplotlib
@@ -67,8 +68,90 @@ def plot_losses(losses_file, save_path='loss_curve.png'):
     plt.close()
     log_print(f"損失曲線已儲存於: {save_path}")
 
+def visualize_feature_space(
+    features_file,
+    data_dir=None,
+    labels_file=None,
+    save_path='visualizations/feature_space.png',
+    title='特徵空間視覺化',
+    auto_label_from_filename=True,
+    method='tsne',  # 'tsne' 或 'umap'
+    random_state=42
+):
+    """
+    使用 t-SNE 或 UMAP 將特徵空間降維並視覺化。
+    labels 來源可以從檔名自動推測，或讀入 labels_file（格式為每行一個整數）。
 
-def visualize_feature_space(features_file, data_dir, labels_file=None, save_path='visualizations/feature_space.png'):
+    Args:
+        features_file (str): .npy 檔，儲存提取好的特徵
+        data_dir (str): 圖片目錄（若使用自動標籤）
+        labels_file (str): 標籤檔（若使用外部標籤）
+        save_path (str): 圖片儲存路徑
+        title (str): 圖片標題
+        auto_label_from_filename (bool): 是否從檔名解析類別
+        method (str): 降維方法，'tsne' 或 'umap'
+        random_state (int): 隨機種子，保證結果穩定
+    """
+    features = np.load(features_file)
+    labels, class_names = [], []
+
+    if auto_label_from_filename and data_dir:
+        image_files = sorted([
+            f for f in os.listdir(data_dir)
+            if f.lower().endswith(('.jpg', '.png', '.jpeg', '.webp'))
+        ])
+        for file_name in image_files:
+            class_name = file_name.split('_')[0]
+            if class_name not in class_names:
+                class_names.append(class_name)
+            labels.append(class_names.index(class_name))
+        labels = np.array(labels)
+    elif labels_file:
+        labels = np.loadtxt(labels_file, dtype=int)
+        class_names = [f'Class {i}' for i in np.unique(labels)]
+    else:
+        raise ValueError("請提供 data_dir 或 labels_file 以生成標籤")
+
+    if len(features) != len(labels):
+        print("❗ 特徵數量與標籤數量不符，請確認資料順序")
+        return
+
+    # 降維
+    if method == 'tsne':
+        perplexity = max(5, min(30, features.shape[0] // 10))
+        reducer = TSNE(n_components=2, random_state=random_state, perplexity=perplexity)
+    elif method == 'umap':
+        reducer = umap.UMAP(n_components=2, random_state=random_state)
+    else:
+        raise ValueError("method 必須為 'tsne' 或 'umap'")
+
+    reduced = reducer.fit_transform(np.nan_to_num(features))
+
+    # 視覺化
+    plt.figure(figsize=(10, 8))
+    unique_labels = np.unique(labels)
+    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_labels)))
+
+    for i, label in enumerate(unique_labels):
+        mask = labels == label
+        plt.scatter(
+            reduced[mask, 0], reduced[mask, 1],
+            c=[colors[i]], label=class_names[label] if label < len(class_names) else f'Class {label}',
+            s=150, alpha=0.7, edgecolors='w'
+        )
+
+    plt.legend(title='類別', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.title(f'{title} - {method.upper()}')
+    plt.xlabel('維度 1')
+    plt.ylabel('維度 2')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"特徵空間 ({method}) 視覺化已儲存於: {save_path}")
+
+'''def visualize_feature_space(features_file, data_dir, labels_file=None, save_path='visualizations/feature_space.png'):
     """使用 t-SNE 視覺化已提取的特徵空間，根據檔名 {類別}_{編號}.jpg 自動標籤"""
     features = np.load(features_file)
     labels, class_names = [], []
@@ -118,7 +201,7 @@ def visualize_feature_space(features_file, data_dir, labels_file=None, save_path
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    log_print(f"特徵空間視覺化結果已儲存於: {save_path}")
+    log_print(f"特徵空間視覺化結果已儲存於: {save_path}")'''
 
 def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualizations/confusion_matrix.png'):
     """繪製混淆矩陣"""
@@ -133,7 +216,7 @@ def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualiz
     plt.close()
     log_print(f"混淆矩陣已儲存於: {save_path}")
 
-def plot_tsne(support_prototypes, query_embeddings, query_labels, idx_to_class, save_path='visualizations/tsne_plot.png'):
+'''def plot_tsne(support_prototypes, query_embeddings, query_labels, idx_to_class, save_path='visualizations/tsne_plot.png'):
     """繪製支持集和查詢集的 t-SNE 視覺化"""
     embeddings = torch.cat([support_prototypes, query_embeddings]).numpy()
     labels = np.concatenate([np.arange(len(support_prototypes)), query_labels])
@@ -151,26 +234,8 @@ def plot_tsne(support_prototypes, query_embeddings, query_labels, idx_to_class, 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    log_print(f"t-SNE 視覺化已儲存於: {save_path}")
+    log_print(f"t-SNE 視覺化已儲存於: {save_path}")'''
 
-def plot_accuracy_vs_k(save_path='visualizations/accuracy_vs_k.png'):
-    """繪製不同 few_shot_k 的準確率曲線"""
-    try:
-        df = pd.read_csv("results_log.txt", skiprows=1, names=["k", "train_acc", "test_acc"])
-        plt.figure(figsize=(8, 6))
-        plt.plot(df["k"], df["train_acc"], label="訓練集準確率", marker='o')
-        plt.plot(df["k"], df["test_acc"], label="測試集準確率", marker='s')
-        plt.xlabel("few_shot_k")
-        plt.ylabel("準確率")
-        plt.title("準確率隨 few_shot_k 變化")
-        plt.legend()
-        plt.grid(True)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        log_print(f"準確率曲線已儲存於: {save_path}")
-    except FileNotFoundError:
-        log_print("錯誤: results_log.txt 不存在，無法繪製準確率曲線")
 
 
 def visualize_attention_maps(model_path, image_path, save_path='visualizations/attention_map.png'):
