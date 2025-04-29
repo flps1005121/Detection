@@ -8,6 +8,7 @@ from PIL import Image
 import os
 import numpy as np
 from tqdm import tqdm
+import sqlite3  # 新增SQLite模組
 # 從model_train導入必要的功能
 from model_train import SimCLRNet, MODEL_SAVE_PATH
 
@@ -65,11 +66,16 @@ class ImageFeatureExtractor:
             print(f"處理圖片 {image_path} 時發生錯誤: {e}")
             return None
     
-    def create_features_database(self, train_dir, cache_file='train_features.npz', force_refresh=True):
-        """為訓練集中所有圖像創建特徵資料庫，支持子類別目錄結構"""
+    def create_features_database(self, train_dir, db_file='train_features.db', force_refresh=True):
+        """為訓練集中所有圖像創建特徵資料庫，支持子類別目錄結構，並儲存到SQLite數據庫"""
         if not os.path.exists(train_dir):
             print(f"錯誤：指定的目錄 {train_dir} 不存在")
             return [], [], []
+        
+        # 檢查是否需要強制刷新數據庫
+        if os.path.exists(db_file) and not force_refresh:
+            print(f"發現已存在的數據庫 {db_file}，正在載入...")
+            return self.load_features_from_database(db_file)
         
         # 使用ImageFolder讀取數據集
         dataset = ImageFolder(
@@ -92,7 +98,7 @@ class ImageFeatureExtractor:
             img_tensor = img_tensor.to(self.device)
             
             with torch.no_grad():
-                # 修正：使用模型的backbone提取特徵
+                # 使用模型的backbone提取特徵
                 feature = self.model.backbone(img_tensor)
                 # 正規化特徵向量
                 feature = F.normalize(feature, dim=1)
@@ -111,23 +117,90 @@ class ImageFeatureExtractor:
             return [], [], []
             
         try:
-            # 保存特徵資料庫 (加入類別標籤)
-            np.savez(cache_file, 
-                     features=np.array(features), 
-                     file_paths=np.array(valid_file_paths),
-                     labels=np.array(labels))
-            print(f"特徵資料庫已儲存到 {os.path.abspath(cache_file)}")
+            # 建立SQLite數據庫連接
+            conn = sqlite3.connect(db_file)
+            cursor = conn.cursor()
+            
+            # 創建特徵資料表
+            cursor.execute('''CREATE TABLE IF NOT EXISTS features
+                        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        file_path TEXT,
+                        label TEXT,
+                        feature BLOB)''')
+            
+            # 如果需要刷新，先清空表
+            if force_refresh:
+                cursor.execute("DELETE FROM features")
+                
+            # 插入數據
+            for file_path, label, feature in zip(valid_file_paths, labels, features):
+                cursor.execute("INSERT INTO features (file_path, label, feature) VALUES (?, ?, ?)",
+                              (file_path, label, feature.tobytes()))
+                              
+            # 提交更改並關閉連接
+            conn.commit()
+            conn.close()
+            
+            print(f"特徵資料庫已儲存到 {os.path.abspath(db_file)}")
             print(f"資料庫包含 {len(dataset.classes)} 個類別: {dataset.classes}")
         except Exception as e:
             print(f"儲存特徵資料庫時發生錯誤: {e}")
         
         return features, valid_file_paths, labels
     
-    def find_similar_images(self, query_img_path, features, file_paths, top_k=5):
-        """尋找與查詢圖像最相似的訓練圖像"""
+    def load_features_from_database(self, db_file):
+        """從SQLite數據庫讀取特徵數據"""
+        if not os.path.exists(db_file):
+            print(f"錯誤：特徵數據庫 {db_file} 不存在")
+            return [], [], []
+        
+        try:
+            # 連接到SQLite數據庫
+            conn = sqlite3.connect(db_file)
+            cursor = conn.cursor()
+            
+            # 讀取所有數據
+            cursor.execute("SELECT file_path, label, feature FROM features")
+            rows = cursor.fetchall()
+            
+            if not rows:
+                print("數據庫中沒有特徵記錄")
+                return [], [], []
+                
+            file_paths = []
+            labels = []
+            features = []
+            
+            for file_path, label, feature_bytes in rows:
+                # 將二進制數據轉換回numpy數組
+                feature = np.frombuffer(feature_bytes, dtype=np.float32)
+                
+                file_paths.append(file_path)
+                labels.append(label)
+                features.append(feature)
+                
+            conn.close()
+            
+            print(f"已從 {db_file} 中載入 {len(features)} 個特徵記錄")
+            return features, file_paths, labels
+            
+        except Exception as e:
+            print(f"從數據庫讀取特徵時發生錯誤: {e}")
+            return [], [], []
+    
+    def find_similar_images(self, query_img_path, db_file=None, features=None, file_paths=None, top_k=5):
+        """尋找與查詢圖像最相似的訓練圖像，支持從數據庫或內存中的特徵進行搜索"""
         query_feature = self.extract_features(query_img_path)
         
         if query_feature is None:
+            return []
+        
+        # 如果提供了數據庫文件但沒有提供特徵，則從數據庫讀取
+        if db_file and (features is None or file_paths is None):
+            features, file_paths, _ = self.load_features_from_database(db_file)
+        
+        if not features or not file_paths:
+            print("沒有特徵數據可供比較")
             return []
         
         # 計算餘弦相似度
@@ -145,12 +218,12 @@ class ImageFeatureExtractor:
 def main():
     print(f"使用設備: {device}")
     
-    # 新增 - 特徵提取測試
+    # 修改 - 特徵提取測試並使用SQLite儲存
     print("\n開始測試特徵提取功能...")
     extractor = ImageFeatureExtractor(model_path=MODEL_SAVE_PATH)
     features, file_paths, labels = extractor.create_features_database(
-        train_dir="dataset/train", 
-        cache_file='train_features.npz',
+        train_dir="feature_db_netwk/train/", 
+        db_file='output/train_features.db',
         force_refresh=True
     )
     print(f"成功提取了 {len(features)} 張圖像的特徵")

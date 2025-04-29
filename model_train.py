@@ -15,14 +15,14 @@ from tqdm import tqdm
 
 # 超參數設定
 DATA_DIR = "dataset/train"
-BATCH_SIZE = 4
-NUM_WORKERS = 2
+BATCH_SIZE = 256
+NUM_WORKERS = 4
 LEARNING_RATE = 0.001
 TEMPERATURE = 0.07
 EPOCHS = 10
-LOSSES_FILE = "training_losses.json"
-MODEL_SAVE_PATH = "simclr_mobilenetv3.pth"
-OUTPUT_DIR = "visualizations"
+LOSSES_FILE = "output/training_losses.json"
+MODEL_SAVE_PATH = "output/simclr_mobilenetv3.pth"
+OUTPUT_DIR = "output/"
 FEATURE_DIM = 128
 
 # 設置設備
@@ -137,7 +137,7 @@ def train_self_supervised(model, data_loader, optimizer, criterion, device, epoc
                 print(f"Early stopping！在第 {epoch+1} epoch 模型不再進步")
                 break
 
-        # 每 2 個 epoch 儲存一次損失記錄或最後一個 epoch
+        # 每個 epoch 儲存一次損失記錄
         if save_path:
             with open(save_path, 'w') as f:
                 json.dump(losses, f)
