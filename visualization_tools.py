@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import json
 from PIL import Image
 from torchvision import transforms, models
-from feature_extractor import SimCLRNet, log_print, device
+from feature_extractor import SimCLRNet, device
 import umap
 
 # 設定支援中文字體
@@ -66,7 +66,7 @@ def plot_losses(losses_file, save_path='loss_curve.png'):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    log_print(f"損失曲線已儲存於: {save_path}")
+    print(f"損失曲線已儲存於: {save_path}")
 
 def visualize_feature_space(
     features_file,
@@ -214,7 +214,7 @@ def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualiz
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    log_print(f"混淆矩陣已儲存於: {save_path}")
+    print(f"混淆矩陣已儲存於: {save_path}")
 
 '''def plot_tsne(support_prototypes, query_embeddings, query_labels, idx_to_class, save_path='visualizations/tsne_plot.png'):
     """繪製支持集和查詢集的 t-SNE 視覺化"""
@@ -241,18 +241,15 @@ def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualiz
 def visualize_attention_maps(model_path, image_path, save_path='visualizations/attention_map.png'):
     """視覺化模型的注意力圖，顯示模型關注的圖像區域"""
     # 使用已有的模型生成注意力圖
-    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    print(f"正在為圖片生成注意力圖：{image_path}")
 
     # 載入預訓練模型
-    model = SimCLRNet(
-        models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1).features,
-        feature_dim=128
-    ).to(device)
+    model = SimCLRNet(feature_dim=128).to(device)
     try:
         model.load_state_dict(torch.load(model_path, map_location=device))
-        log_print(f"成功載入模型權重: {model_path}")
+        print(f"成功載入模型權重: {model_path}")
     except Exception as e:
-        log_print(f"載入模型權重失敗: {e}")
+        print(f"載入模型權重失敗: {e}")
         return
 
     model.eval()
@@ -260,11 +257,11 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
     # 使用模型的主幹網路
     backbone = model.backbone
 
-    # 定義要提取的層
+    # 定義要提取的層 (根據MobileNetV3的結構選擇不同層級)
     target_layers = {
-        'layer_4': backbone.features[4],   # 早期層
-        'layer_8': backbone.features[8],   # 中期層
-        'layer_12': backbone.features[12], # 後期層
+        '早期層': backbone.features[4],   # 初始特徵提取層
+        '中期層': backbone.features[8],   # 中間層
+        '後期層': backbone.features[12],  # 後期層
     }
 
     # 保存各層特徵圖
@@ -277,7 +274,9 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
         return hook
 
     # 註冊鉤子
-    hooks = [layer.register_forward_hook(get_activation(name)) for name, layer in target_layers.items()]
+    hooks = []
+    for name, layer in target_layers.items():
+        hooks.append(layer.register_forward_hook(get_activation(name)))
 
     # 讀取並預處理圖像
     original_img = Image.open(image_path).convert('RGB')
@@ -285,23 +284,21 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
 
     # 使用與訓練相同的預處理
     transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     input_tensor = transform(original_img).unsqueeze(0).to(device)
 
     # 進行推論以獲取特徵圖
     with torch.no_grad():
-        _ = backbone(input_tensor)
+        _ = backbone.features(input_tensor)
 
     # 移除鉤子
     for hook in hooks:
         hook.remove()
 
     # 繪製視覺化
-    # 創建子圖
     fig, axes = plt.subplots(2, len(target_layers) + 1, figsize=(16, 8))
 
     # 第一個子圖顯示原始圖像
@@ -327,15 +324,16 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
             continue
 
         # 正規化為 0-1 範圍
-        attention = (attention - attention.min()) / (attention.max() - attention.min() + 1e-8)
-
+        attention_min = attention.min()
+        attention_max = attention.max()
+        if attention_max > attention_min:  # 避免除以零
+            attention = (attention - attention_min) / (attention_max - attention_min)
+        
         # 調整大小以匹配輸入圖像
-        attention_resized = torch.nn.functional.interpolate(
-            torch.from_numpy(attention).unsqueeze(0).unsqueeze(0),
-            size=original_np.shape[:2],
-            mode='bilinear',
-            align_corners=False
-        ).squeeze().numpy()
+        from skimage.transform import resize
+        attention_resized = resize(attention, original_np.shape[:2], 
+                                  order=1, mode='constant',
+                                  anti_aliasing=True)
 
         # 顯示熱力圖
         axes[0, layer_idx].imshow(attention, cmap='jet')
@@ -347,7 +345,8 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
         colored_heatmap = cm.jet(attention_resized)[:, :, :3]
 
         # 疊加到原始圖像
-        overlay = (colored_heatmap * 0.5 + original_np / 255 * 0.5)
+        original_normalized = original_np.astype(float) / 255.0
+        overlay = (colored_heatmap * 0.7 + original_normalized * 0.3)
         overlay = np.clip(overlay, 0, 1)
 
         # 顯示疊加後的圖像
@@ -359,48 +358,47 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    log_print(f"分層特徵熱圖已儲存於: {save_path}")
-
+    print(f"分層特徵熱圖已儲存於: {save_path}")
 
 if __name__ == "__main__":
     # 主程式入口
     device = torch.device("mps" if torch.mps.is_available() else "cpu")
-    log_print(f"使用設備: {device}")
+    print(f"使用設備: {device}")
 
     # 設置文件路徑
-    model_path = 'self_supervised_mobilenetv3.pth'
+    model_path = 'output/simclr_mobilenetv3.pth'
     data_dir = 'dataset/train'
-    test_data_dir = 'dataset/test'
-    losses_file = 'training_losses.json'
-    features_file = 'features/features.npy'
-    output_dir = 'visualizations'
+    test_data_dir = 'feature_db_netwk/test/eagle'
+    losses_file = 'output/training_losses.json'
+    features_file = 'output/features/features.npy'
+    output_dir = 'output/visualizations'
 
     # 確保輸出目錄存在
     os.makedirs(output_dir, exist_ok=True)
 
     # 執行視覺化任務
-    log_print("開始視覺化分析...")
+    print("開始視覺化分析...")
 
     # 繪製損失曲線
     if os.path.exists(losses_file):
-        log_print("繪製訓練損失曲線...")
+        print("繪製訓練損失曲線...")
         plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
 
     # 視覺化特徵空間 (使用已生成的特徵)
     if os.path.exists(features_file):
-        log_print("視覺化特徵空間...")
+        print("視覺化特徵空間...")
         visualize_feature_space(features_file, data_dir, save_path=os.path.join(output_dir, 'feature_space.png'))
 
     # 生成注意力圖
     if os.path.exists(model_path) and os.path.exists(test_data_dir):
         if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-            log_print("生成模型注意力圖...")
+            print("生成模型注意力圖...")
             visualize_attention_maps(model_path,
                                     os.path.join(test_data_dir, test_images[0]),
                                     os.path.join(output_dir, 'attention_map.png'))
-    # 繪製準確率曲線（需要 results_log.txt）
-    if os.path.exists('results_log.txt'):
-        log_print("繪製準確率曲線...")
-        plot_accuracy_vs_k(os.path.join(output_dir, 'accuracy_vs_k.png'))
+    # # 繪製準確率曲線（需要 results_log.txt）
+    # if os.path.exists('results_log.txt'):
+    #     log_print("繪製準確率曲線...")
+    #     plot_accuracy_vs_k(os.path.join(output_dir, 'accuracy_vs_k.png'))
 
-    log_print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
+    print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")

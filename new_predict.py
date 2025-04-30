@@ -128,8 +128,15 @@ if __name__ == "__main__":
     model_path = 'output/simclr_mobilenetv3.pth'
     top_k = 5
     db_file = 'output/train_features.db'
-    log_file = 'output/prediction_logs.txt'
+    
+    # 確保結果目錄存在
+    result_dir = 'output/result/'
+    os.makedirs(result_dir, exist_ok=True)
+    
+    # 使用時間戳記生成唯一的檔名
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = f'{result_dir}prediction_{timestamp}.txt'
     
     # 執行相似圖像預測
-    print("\n執行相似圖像預測...")
+    print(f"\n執行相似圖像預測...\n結果將保存到: {log_file}")
     predict_and_display(test_dir, top_k, db_file, log_file)
