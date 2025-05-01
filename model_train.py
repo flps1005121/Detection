@@ -61,6 +61,10 @@ class SimCLRNet(nn.Module):
         self.backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
         self.backbone.classifier = nn.Identity()
 
+        self.feature_maps = []  # 儲存中間特徵圖
+        def hook_fn(module, input, output):
+            self.feature_maps.append(output.detach())
+
         self.projector = nn.Sequential(
             nn.Linear(576, 512),             # 第一層全連接層
             nn.BatchNorm1d(512),             # 批次正規化，穩定訓練
@@ -75,6 +79,7 @@ class SimCLRNet(nn.Module):
 
 
     def forward(self, x):
+        self.feature_maps.clear()  # 每次 forward 清空舊資料
         h = self.backbone.features(x)
         h = F.adaptive_avg_pool2d(h, (1, 1))
         h = h.view(h.size(0), -1)

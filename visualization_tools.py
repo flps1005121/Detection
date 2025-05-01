@@ -328,10 +328,10 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
         attention_max = attention.max()
         if attention_max > attention_min:  # 避免除以零
             attention = (attention - attention_min) / (attention_max - attention_min)
-        
+
         # 調整大小以匹配輸入圖像
         from skimage.transform import resize
-        attention_resized = resize(attention, original_np.shape[:2], 
+        attention_resized = resize(attention, original_np.shape[:2],
                                   order=1, mode='constant',
                                   anti_aliasing=True)
 
@@ -359,6 +359,95 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"分層特徵熱圖已儲存於: {save_path}")
+
+def visualize_perturbation_attention(model_path, image_path, patch_size=32, save_path='visualizations/perturb_attention_map.png'):
+    # 載入模型
+    model = SimCLRNet(feature_dim=128).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+    backbone = model.backbone
+
+    # 圖片預處理
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    original_img = Image.open(image_path).convert('RGB')
+    input_tensor = transform(original_img).unsqueeze(0).to(device)
+
+    # 原圖特徵
+    with torch.no_grad():
+        original_feat = backbone(input_tensor).squeeze()
+
+    # 原圖為 numpy
+    original_np = np.array(original_img.resize((224, 224)))
+    img_np = original_np.astype(np.float32) / 255.0
+
+    # 切成 patch
+    H, W = 224, 224
+    num_patches_y = H // patch_size
+    num_patches_x = W // patch_size
+
+    importance_map = np.zeros((num_patches_y, num_patches_x))
+
+    for i in range(num_patches_y):
+        for j in range(num_patches_x):
+            # 複製圖片
+            perturbed = img_np.copy()
+
+            # 遮蔽 patch（你也可以改成模糊、加雜訊）
+            y_start, y_end = i * patch_size, (i + 1) * patch_size
+            x_start, x_end = j * patch_size, (j + 1) * patch_size
+            perturbed[y_start:y_end, x_start:x_end, :] = 0.0  # 遮住該 patch
+
+            # Tensor 處理
+            perturbed_img = transforms.ToTensor()(perturbed).unsqueeze(0)
+            perturbed_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(perturbed_img).to(device)
+
+            # 前向傳播
+            with torch.no_grad():
+                perturbed_feat = backbone(perturbed_img).squeeze()
+
+            # 計算 cosine distance
+            distance = 1 - F.cosine_similarity(original_feat, perturbed_feat, dim=0).item()
+            importance_map[i, j] = distance
+
+    # 正規化 heatmap
+    heatmap = (importance_map - importance_map.min()) / (importance_map.max() - importance_map.min())
+
+    # 上採樣到原圖大小
+    attention_resized = resize(heatmap, (H, W), order=1, mode='constant', anti_aliasing=True)
+
+    # 疊加 heatmap
+    import matplotlib.cm as cm
+    colored_heatmap = cm.jet(attention_resized)[:, :, :3]
+    overlay = colored_heatmap * 0.6 + img_np * 0.4
+    overlay = np.clip(overlay, 0, 1)
+
+    # 畫圖
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 3, 1)
+    plt.imshow(img_np)
+    plt.title("原始圖像")
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.imshow(attention_resized, cmap='jet')
+    plt.title("重要性熱圖")
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.imshow(overlay)
+    plt.title("注意力疊加")
+    plt.axis('off')
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+
+    print(f"Perturbation-based Attention Map 已儲存於: {save_path}")
 
 if __name__ == "__main__":
     # 主程式入口
