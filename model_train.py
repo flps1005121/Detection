@@ -88,6 +88,7 @@ class SimCLRNet(nn.Module):
         z = self.projector(h)
         return F.normalize(z, dim=1)
 
+
 # 對比學習損失函數
 class NTXentLoss(nn.Module):
     def __init__(self, temperature=0.5):
