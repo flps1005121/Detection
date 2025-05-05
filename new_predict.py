@@ -6,6 +6,7 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 import datetime  # 導入 datetime 模組用於時間戳記
+import sqlite3   # 添加SQLite數據庫支持
 
 # 導入我們剛創建的特徵提取器
 from feature_extractor import ImageFeatureExtractor
@@ -18,6 +19,46 @@ def log_to_file(log_file, message, print_to_console=True):
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(message + '\n')
 
+def load_features_from_database(db_file):
+    """從SQLite數據庫讀取特徵數據"""
+    if not os.path.exists(db_file):
+        print(f"錯誤：特徵數據庫 {db_file} 不存在")
+        return [], [], []
+    
+    try:
+        # 連接到SQLite數據庫
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        
+        # 讀取所有數據
+        cursor.execute("SELECT file_path, label, feature FROM features")
+        rows = cursor.fetchall()
+        
+        if not rows:
+            print("數據庫中沒有特徵記錄")
+            return [], [], []
+            
+        file_paths = []
+        labels = []
+        features = []
+        
+        for file_path, label, feature_bytes in rows:
+            # 將二進制數據轉換回numpy數組
+            feature = np.frombuffer(feature_bytes, dtype=np.float32)
+            
+            file_paths.append(file_path)
+            labels.append(label)
+            features.append(feature)
+            
+        conn.close()
+        
+        print(f"已從 {db_file} 中載入 {len(features)} 個特徵記錄")
+        return features, file_paths, labels
+        
+    except Exception as e:
+        print(f"從數據庫讀取特徵時發生錯誤: {e}")
+        return [], [], []
+
 def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file=None):
     """預測並顯示結果，可選擇性地記錄到檔案中"""
     # 記錄開始時間
@@ -27,9 +68,9 @@ def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file
     # 創建特徵提取器實例
     extractor = ImageFeatureExtractor(model_path=model_path)
     
-    # 使用load_features_from_database從SQLite數據庫載入特徵
+    # 使用本地函數從SQLite數據庫載入特徵
     try:
-        train_features, train_file_paths, train_labels = extractor.load_features_from_database(db_file)
+        train_features, train_file_paths, train_labels = load_features_from_database(db_file)
         log_to_file(log_file, f"成功從 {db_file} 載入 {len(train_file_paths)} 個特徵向量")
     except Exception as e:
         log_to_file(log_file, f"無法載入特徵資料庫 {db_file}: {str(e)}")
@@ -39,12 +80,9 @@ def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file
         log_to_file(log_file, "無法繼續：訓練集特徵資料庫為空")
         return
 
-    # 使用ImageFolder載入測試集圖像
-    # 定義測試集的轉換函數
-    test_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
+    # 使用與特徵提取器相同的轉換函數，確保一致性
+    # 讓我們直接使用特徵提取器的轉換函數
+    test_transform = extractor.transform
     
     test_dataset = ImageFolder(root=test_dir, transform=test_transform)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
@@ -74,16 +112,28 @@ def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file
 
 def process_test_image(test_img_path, test_img_name, train_features, train_file_paths, extractor, top_k, results, log_file=None, class_name=None):
     """處理單個測試圖像並添加結果"""
-    # 使用更新的find_similar_images方法，不需要db_file參數，因為已經載入了features和file_paths
-    similar_images = extractor.find_similar_images(
-        test_img_path, 
-        features=train_features, 
-        file_paths=train_file_paths, 
-        top_k=top_k
-    )
+    # 直接使用extract_features從測試圖像提取特徵
+    query_feature = extractor.extract_features(test_img_path)
+    
+    if query_feature is None:
+        log_to_file(log_file, f"無法處理測試圖像: {test_img_name}")
+        return
+    
+    # 計算與訓練集中所有特徵的余弦相似度
+    similarities = []
+    for idx, train_feature in enumerate(train_features):
+        # 余弦相似度計算: cos(θ) = A·B / (||A||·||B||)
+        sim = np.dot(query_feature, train_feature) / (np.linalg.norm(query_feature) * np.linalg.norm(train_feature))
+        similarities.append((train_file_paths[idx], sim))
+    
+    # 根據相似度排序
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    
+    # 選擇前top_k個最相似的結果
+    similar_images = similarities[:top_k]
 
     if not similar_images:
-        log_to_file(log_file, f"無法處理測試圖像: {test_img_name}")
+        log_to_file(log_file, f"無法找到相似的圖像: {test_img_name}")
         return
 
     # 顯示結果
