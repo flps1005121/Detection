@@ -143,7 +143,7 @@ def main():
     print("\n開始測試特徵提取功能...")
     extractor = ImageFeatureExtractor(model_path=MODEL_SAVE_PATH)
     features, file_paths, labels = extractor.create_features_database(
-        train_dir="feature_db_netwk/train/", 
+        train_dir="feature_db/train/", 
         db_file='output/train_features.db',
         force_refresh=True
     )
