@@ -1,0 +1,69 @@
+已載入 2 個類別的原型特徵
+預測結果摘要:
+--------------------------------------------------------------------------------
+圖像 | 預測標籤 | 最高相似樣本 | 相似度 | 決策 | 置信度
+--------------------------------------------------------------------------------
+bookcase_0428_B28_01.jpg | 未知 | vending_0428_B35_03.jpg (vending) | 0.5996 | 拒絕 | 0.5996
+bookcase_0428_B28_15.jpg | 未知 | vending_0430_B09_16.JPG (vending) | 0.6723 | 拒絕 | 0.6723
+bookcase_0428_B35_08.jpg | 未知 | vending_0430_B35_08.jpg (vending) | 0.5897 | 拒絕 | 0.5897
+bookcase_0428_B35_14.jpg | 未知 | vending_0430_B35_08.jpg (vending) | 0.6237 | 拒絕 | 0.6237
+bookcase_0430_B09_01.JPG | 未知 | vending_0428_B28_04.jpg (vending) | 0.6567 | 拒絕 | 0.6567
+bookcase_0430_B09_02.JPG | 未知 | vending_0503_B20_09.jpg (vending) | 0.7274 | 拒絕 | 0.7274
+bookcase_0430_B09_04.JPG | 未知 | vending_0503_B20_09.jpg (vending) | 0.6506 | 拒絕 | 0.6506
+bookcase_0430_B24_03.jpeg | 未知 | vending_0501_B09_04.JPG (vending) | 0.6223 | 拒絕 | 0.6223
+bookcase_0430_B24_05.jpeg | 未知 | vending_0430_B28_07.jpg (vending) | 0.6324 | 拒絕 | 0.6324
+bookcase_0430_B24_08.jpeg | 未知 | vending_0430_B24_15.jpeg (vending) | 0.5478 | 拒絕 | 0.5478
+bookcase_0430_B24_13.jpeg | 未知 | vending_0430_B28_04.jpg (vending) | 0.5162 | 拒絕 | 0.5162
+bookcase_0430_B24_16.jpeg | 未知 | vending_0501_B09_05.JPG (vending) | 0.6968 | 拒絕 | 0.6968
+bookcase_0430_B28_01.jpg | 未知 | vending_0428_B28_05.jpg (vending) | 0.5516 | 拒絕 | 0.5516
+bookcase_0430_B28_04.jpg | 未知 | vending_0428_B28_05.jpg (vending) | 0.6049 | 拒絕 | 0.6049
+bookcase_0430_B28_06.jpg | 未知 | vending_0430_B28_04.jpg (vending) | 0.5740 | 拒絕 | 0.5740
+bookcase_0430_B28_11.jpg | 未知 | vending_0430_B09_03.JPG (vending) | 0.5719 | 拒絕 | 0.5719
+bookcase_0430_B35_14.jpg | 未知 | vending_0430_B09_11.JPG (vending) | 0.4860 | 拒絕 | 0.4860
+bookcase_0501_B09_13.JPG | 未知 | vending_0501_B09_06.JPG (vending) | 0.7726 | 拒絕 (原型驗證) | 0.7726
+bookcase_0501_B09_15.JPG | 未知 | vending_0430_B24_06.jpeg (vending) | 0.7585 | 拒絕 (原型驗證) | 0.7585
+bookcase_0503_B20_01.jpg | 未知 | vending_0428_B28_10.jpg (vending) | 0.5907 | 拒絕 | 0.5907
+bookcase_0503_B20_15.jpg | 未知 | vending_0430_B09_11.JPG (vending) | 0.8314 | 拒絕 (原型驗證) | 0.8314
+bookcase_0504_B20_02.jpg | 未知 | vending_0504_B20_15.jpg (vending) | 0.5631 | 拒絕 | 0.5631
+bookcase_0504_B20_03.jpg | 未知 | vending_0428_B28_10.jpg (vending) | 0.5104 | 拒絕 | 0.5104
+bookcase_0504_B20_11.jpg | 未知 | vending_0504_B20_33.jpg (vending) | 0.7239 | 拒絕 | 0.7239
+bookcase_0504_B20_12.jpg | 未知 | vending_0504_B20_33.jpg (vending) | 0.5334 | 拒絕 | 0.5334
+bookcase_0504_B20_14.jpg | 未知 | vending_0430_B35_08.jpg (vending) | 0.5711 | 拒絕 | 0.5711
+bookcase_0504_B20_15.jpg | 未知 | vending_0504_B20_27.jpg (vending) | 0.6239 | 拒絕 | 0.6239
+bookcase_0504_B20_17.jpg | 未知 | vending_0430_B28_11.jpg (vending) | 0.5854 | 拒絕 | 0.5854
+vending_0428_B28_02.jpg | vending | vending_0430_B09_05.JPG (vending) | 0.9642 | 接受 | 0.9642
+vending_0428_B28_12.jpg | vending | vending_0428_B35_14.jpg (vending) | 0.9529 | 接受 | 0.9529
+vending_0428_B28_14.jpg | vending | vending_0428_B35_12.jpg (vending) | 0.9723 | 接受 | 0.9723
+vending_0428_B35_01.jpg | vending | vending_0430_B09_05.JPG (vending) | 0.9270 | 接受 | 0.9270
+vending_0428_B35_06.jpg | vending | vending_0428_B28_06.jpg (vending) | 0.9585 | 接受 | 0.9585
+vending_0428_B35_08.jpg | vending | vending_0428_B35_07.jpg (vending) | 0.9586 | 接受 | 0.9586
+vending_0430_B09_02.JPG | vending | vending_0430_B09_16.JPG (vending) | 0.9751 | 接受 | 0.9751
+vending_0430_B09_04.JPG | vending | vending_0430_B28_02.jpg (vending) | 0.9571 | 接受 | 0.9571
+vending_0430_B09_14.JPG | vending | vending_0430_B09_13.JPG (vending) | 0.9950 | 接受 | 0.9950
+vending_0430_B24_02.jpeg | vending | vending_0430_B24_05.jpeg (vending) | 0.9121 | 接受 | 0.9121
+vending_0430_B28_06.jpg | vending | vending_0430_B28_10.jpg (vending) | 0.9023 | 接受 | 0.9023
+vending_0430_B28_09.jpg | vending | vending_0430_B28_10.jpg (vending) | 0.9443 | 接受 | 0.9443
+vending_0430_B28_14.jpg | vending | vending_0430_B28_12.jpg (vending) | 0.9553 | 接受 | 0.9553
+vending_0430_B28_15.jpg | vending | vending_0430_B28_12.jpg (vending) | 0.9844 | 接受 | 0.9844
+vending_0430_B35_04.jpg | vending | vending_0430_B28_10.jpg (vending) | 0.9197 | 接受 | 0.9197
+vending_0430_B35_06.jpg | 未知 | vending_0430_B35_07.jpg (vending) | 0.8787 | 拒絕 (原型驗證) | 0.8787
+vending_0430_B35_13.jpg | vending | vending_0430_B35_10.jpg (vending) | 0.9216 | 接受 | 0.9216
+vending_0501_B09_01.JPG | vending | vending_0501_B09_03.JPG (vending) | 0.9485 | 接受 | 0.9485
+vending_0501_B09_11.JPG | 未知 | vending_0503_B20_06.jpg (vending) | 0.8711 | 拒絕 (原型驗證) | 0.8711
+vending_0501_B09_14.JPG | vending | vending_0501_B09_13.JPG (vending) | 0.9109 | 接受 | 0.9109
+vending_0503_B20_01.jpg | 未知 | vending_0503_B20_06.jpg (vending) | 0.7569 | 拒絕 (原型驗證) | 0.7569
+vending_0504_B20_01.jpg | 未知 | vending_0504_B20_33.jpg (vending) | 0.8584 | 拒絕 (原型驗證) | 0.8584
+vending_0504_B20_03.jpg | vending | vending_0504_B20_09.jpg (vending) | 0.9245 | 接受 | 0.9245
+vending_0504_B20_04.jpg | vending | vending_0504_B20_26.jpg (vending) | 0.9192 | 接受 | 0.9192
+vending_0504_B20_08.jpg | vending | vending_0504_B20_23.jpg (vending) | 0.9667 | 接受 | 0.9667
+vending_0504_B20_10.jpg | 未知 | vending_0503_B20_14.jpg (vending) | 0.8862 | 拒絕 (原型驗證) | 0.8862
+vending_0504_B20_11.jpg | vending | vending_0504_B20_14.jpg (vending) | 0.9332 | 接受 | 0.9332
+vending_0504_B20_13.jpg | 未知 | vending_0503_B20_02.jpg (vending) | 0.8828 | 拒絕 (原型驗證) | 0.8828
+vending_0504_B20_22.jpg | 未知 | vending_0503_B20_14.jpg (vending) | 0.5277 | 拒絕 | 0.5277
+vending_0504_B20_24.jpg | 未知 | vending_0504_B20_06.jpg (vending) | 0.8339 | 拒絕 (原型驗證) | 0.8339
+vending_0504_B20_29.jpg | vending | vending_0504_B20_25.jpg (vending) | 0.9041 | 接受 | 0.9041
+vending_0504_B20_31.jpg | 未知 | vending_0503_B20_14.jpg (vending) | 0.7394 | 拒絕 | 0.7394
+--------------------------------------------------------------------------------
+總共處理: 60 張圖像
+接受分類: 23 張 (38.3%)
+拒絕分類: 37 張 (61.7%)
