@@ -9,7 +9,7 @@ import datetime  # 導入 datetime 模組用於時間戳記
 import sqlite3   # 添加SQLite數據庫支持
 
 # 導入我們剛創建的特徵提取器
-from feature_extractor import ImageFeatureExtractor
+from backup_code.feature_extractor import ImageFeatureExtractor
 
 def log_to_file(log_file, message, print_to_console=True):
     """將訊息同時輸出到控制台和日誌檔案"""
