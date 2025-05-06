@@ -138,7 +138,7 @@ def process_test_image_with_prototype(test_img_path, test_img_name, prototypes, 
         final_label = most_similar_label
     else:
         decision = "拒絕"
-        final_label = "未知"
+        final_label = "??"
     
     # 保存結果以便摘要顯示
     results.append({
@@ -153,10 +153,22 @@ def process_test_image_with_prototype(test_img_path, test_img_name, prototypes, 
 
 def display_results_summary(results, log_file=None):
     """顯示結果摘要，只包含原型比對結果"""
+    # 定義每個欄位的寬度
+    col_widths = {
+        'Image': 25,
+        'Label': 10,
+        'Similar': 7,
+        '決策': 2
+    }
+    
+    # 格式化表頭
+    header = f"{'Image':<{col_widths['Image']}} | {'Label':<{col_widths['Label']}} | {'Similar':<{col_widths['Similar']}} | {'決策':<{col_widths['決策']}}"
+    separator = "-" * len(header)
+    
     log_to_file(log_file, "預測結果摘要 (只使用原型比對):")
-    log_to_file(log_file, "-"*80)
-    log_to_file(log_file, "圖像 | 預測標籤 | 相似度 | 樣本數 | 決策")
-    log_to_file(log_file, "-"*80)
+    log_to_file(log_file, separator)
+    log_to_file(log_file, header)
+    log_to_file(log_file, separator)
     
     # 統計接受和拒絕的數量
     accepted = 0
@@ -168,12 +180,14 @@ def display_results_summary(results, log_file=None):
             accepted += 1
         else:
             rejected += 1
-            
-        log_to_file(log_file, f"{result['test_image']} | {result['final_label']} | " \
-                             f"{result['similarity']:.4f} | {result['sample_count']} | {decision_str}")
+        
+        # 先格式化浮點數，再設定寬度對齊
+        sim_str = f"{result['similarity']:.4f}"
+        line = f"{result['test_image']:<{col_widths['Image']}} | {result['final_label']:<{col_widths['Label']}} | {sim_str:<{col_widths['Similar']}} | {decision_str:<{col_widths['決策']}}"
+        log_to_file(log_file, line)
     
     # 顯示統計
-    log_to_file(log_file, "-"*80)
+    log_to_file(log_file, separator)
     log_to_file(log_file, f"總共處理: {len(results)} 張圖像")
     log_to_file(log_file, f"接受分類: {accepted} 張 ({accepted/len(results)*100:.1f}%)")
     log_to_file(log_file, f"拒絕分類: {rejected} 張 ({rejected/len(results)*100:.1f}%)")
@@ -184,10 +198,10 @@ if __name__ == "__main__":
     test_dir = 'feature_db/test/'
     model_path = 'output/simclr_mobilenetv3.pth'
     db_file = 'output/train_features.db'
-    selected_label = 'vending'  # 預設為None，表示比對所有標籤
+    selected_label = None  # 預設為None，表示比對所有標籤
     
     # 相似度閾值設定
-    threshold = 0.75  # 閾值：高於此值接受，低於此值拒絕
+    threshold = 0.7  # 閾值：高於此值接受，低於此值拒絕
     
     # 確保結果目錄
     result_dir = 'output/result/'
