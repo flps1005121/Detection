@@ -9,7 +9,7 @@ import datetime  # 導入 datetime 模組用於時間戳記
 import sqlite3   # 添加SQLite數據庫支持
 
 # 導入我們剛創建的特徵提取器
-from feature_extractor import ImageFeatureExtractor
+from backup_code.feature_extractor import ImageFeatureExtractor
 
 def log_to_file(log_file, message, print_to_console=True):
     """將訊息同時輸出到控制台和日誌檔案"""
@@ -144,22 +144,66 @@ def process_test_image(test_img_path, test_img_name, train_features, train_file_
     # 找出最相似的圖片（第一個結果）
     most_similar_path, highest_similarity = similar_images[0]
     most_similar_name = os.path.basename(most_similar_path)
+    
+    # 從檔案路徑提取類別名稱 (假設路徑格式為：.../類別/檔名.jpg)
+    most_similar_class = os.path.basename(os.path.dirname(most_similar_path))
+    
+    # 實現雙重閾值判斷邏輯
+    prediction_confidence = "未知"
+    prediction_reason = ""
+    
+    if highest_similarity > 0.8:
+        # 高可信度 - 直接採用最相似圖片的類別
+        prediction_confidence = "高可信度"
+        prediction_reason = f"相似度 {highest_similarity:.4f} > 0.8"
+    elif highest_similarity < 0.7:
+        # 低可信度 - 判定為未知類別
+        most_similar_name = "未知類別"
+        most_similar_class = "未知類別"
+        prediction_confidence = "低可信度"
+        prediction_reason = f"相似度 {highest_similarity:.4f} < 0.7"
+    else:
+        # 中等可信度 - 需要進一步分析相似度差距
+        if len(similar_images) > 1:
+            second_best_similarity = similar_images[1]
+            similarity_gap = highest_similarity - second_best_similarity
+            
+            # 若最佳與次佳相似度差距大於0.1，採用最佳結果
+            if similarity_gap > 0.1:
+                prediction_confidence = "中可信度-採用"
+                prediction_reason = f"相似度差距 {similarity_gap:.4f} > 0.1"
+            else:
+                most_similar_name = "未知類別"
+                most_similar_class = "未知類別"
+                prediction_confidence = "中可信度-拒絕"
+                prediction_reason = f"相似度差距 {similarity_gap:.4f} <= 0.1"
+        else:
+            most_similar_name = "未知類別"
+            most_similar_class = "未知類別"
+            prediction_confidence = "中可信度-拒絕"
+            prediction_reason = "找不到次佳匹配以比較差距"
 
-    log_to_file(log_file, f"最相似圖片: {most_similar_name} (相似度: {highest_similarity:.4f})")
+    log_to_file(log_file, f"最相似圖片: {most_similar_name} (類別: {most_similar_class}, 相似度: {highest_similarity:.4f})")
+    log_to_file(log_file, f"判斷可信度: {prediction_confidence}")
+    log_to_file(log_file, f"判斷依據: {prediction_reason}")
     log_to_file(log_file, "-"*50)
 
     # 顯示所有相似圖片的排名
     log_to_file(log_file, "所有相似圖片排名:")
     for i, (img_path, similarity) in enumerate(similar_images):
-        log_to_file(log_file, f"  {i+1}. {os.path.basename(img_path)} - 相似度: {similarity:.4f}")
+        img_class = os.path.basename(os.path.dirname(img_path))
+        log_to_file(log_file, f"  {i+1}. {os.path.basename(img_path)} (類別: {img_class}) - 相似度: {similarity:.4f}")
 
     # 保存結果以便後續整理
     results.append({
         'test_image': test_img_name,
         'class_name': class_name,
         'most_similar': most_similar_name,
+        'most_similar_class': most_similar_class,
         'similarity': highest_similarity,
-        'all_similars': [(os.path.basename(p), s) for p, s in similar_images]
+        'confidence': prediction_confidence,
+        'reason': prediction_reason,
+        'all_similars': [(os.path.basename(p), os.path.basename(os.path.dirname(p)), s) for p, s in similar_images]
     })
 
 def display_results_summary(results, log_file=None):
@@ -167,14 +211,33 @@ def display_results_summary(results, log_file=None):
     log_to_file(log_file, "\n" + "="*50)
     log_to_file(log_file, "預測結果摘要:")
     log_to_file(log_file, "-"*50)
+    
+    # 統計成功和失敗的分類數量
+    total_images = len(results)
+    unknown_count = sum(1 for result in results if result['most_similar_class'] == "未知類別")
+    classified_count = total_images - unknown_count
+    
+    # 計算百分比
+    classified_percentage = (classified_count / total_images * 100) if total_images > 0 else 0
+    unknown_percentage = (unknown_count / total_images * 100) if total_images > 0 else 0
+    
+    # 顯示每個測試圖片的結果
     for result in results:
         class_info = f" (類別: {result['class_name']})" if 'class_name' in result and result['class_name'] else ""
-        log_to_file(log_file, f"{result['test_image']}{class_info} -> {result['most_similar']} (相似度: {result['similarity']:.4f})")
+        log_to_file(log_file, f"{result['test_image']}{class_info} -> 類別: {result['most_similar_class']} (相似度: {result['similarity']:.4f}, {result['confidence']})")
+    
+    # 顯示總體統計
+    log_to_file(log_file, "\n" + "="*50)
+    log_to_file(log_file, "分類統計:")
+    log_to_file(log_file, f"總圖片數量: {total_images}")
+    log_to_file(log_file, f"成功分類數量: {classified_count} ({classified_percentage:.2f}%)")
+    log_to_file(log_file, f"未能分類數量: {unknown_count} ({unknown_percentage:.2f}%)")
+    log_to_file(log_file, "="*50)
 
 # 直接執行的主程式碼
 if __name__ == "__main__":
     # 要預測的參數設定
-    test_dir = 'feature_db_netwk/test/'
+    test_dir = 'feature_db/test/'
     model_path = 'output/simclr_mobilenetv3.pth'
     top_k = 5
     db_file = 'output/train_features.db'
