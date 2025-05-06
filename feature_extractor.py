@@ -65,7 +65,7 @@ class ImageFeatureExtractor:
         # 檢查是否需要強制刷新數據庫
         if os.path.exists(db_file) and not force_refresh:
             print(f"發現已存在的數據庫 {db_file}，正在載入...")
-            from new_predict import load_features_from_database
+            from old_compare import load_features_from_database
             return load_features_from_database(db_file)
         
         # 使用ImageFolder讀取數據集
@@ -143,7 +143,7 @@ def main():
     print("\n開始測試特徵提取功能...")
     extractor = ImageFeatureExtractor(model_path=MODEL_SAVE_PATH)
     features, file_paths, labels = extractor.create_features_database(
-        train_dir="feature_db_netwk/train/", 
+        train_dir="feature_db/train/", 
         db_file='output/train_features.db',
         force_refresh=True
     )
