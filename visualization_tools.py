@@ -365,6 +365,61 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
     print(f"分層特徵熱圖已儲存於: {save_path}")
 
 
+def visualize_cbam_attention(model_path, image_path, save_path='visualizations/cbam_attention.png', device='cpu'):
+    print(f"視覺化 CBAM 注意力圖: {image_path}")
+
+    model = SimCLRNet().to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
+    img = Image.open(image_path).convert('RGB')
+    input_tensor = transform(img).unsqueeze(0).to(device)
+
+    _ = model(input_tensor)  # forward 呼叫，CBAM attention 會自動儲存
+    channel_attention = model.cbam.last_channel_attention[0].squeeze().cpu().numpy()  # (C,)
+    spatial_attention = model.cbam.last_spatial_attention[0].squeeze().cpu().numpy()  # (H, W)
+
+
+    original_np = np.array(img.resize((224, 224)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+    axes[0].imshow(original_np)
+    axes[0].set_title("原始圖片")
+    axes[0].axis('off')
+
+    spatial_resized = resize(spatial_attention, original_np.shape[:2], order=0, mode='edge', anti_aliasing=False)
+    axes[1].imshow(spatial_resized, cmap='jet')
+    axes[1].set_title("CBAM 空間注意力圖")
+    axes[1].axis('off')
+
+
+    import matplotlib.cm as cm
+    colored = cm.jet(spatial_resized)[..., :3]
+    overlay = np.clip((colored * 0.3 + original_np / 255 * 0.7), 0, 1)
+    axes[2].imshow(overlay)
+    axes[2].set_title("疊加後的 CBAM 空間注意力")
+    axes[2].axis('off')
+
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+    print(f"CBAM 注意力圖已儲存至 {save_path}")
+    high_attention_mask = spatial_resized > np.percentile(spatial_resized, 90)
+    masked_input = input_tensor.clone()
+    masked_input[:, :, high_attention_mask] = 0
+    with torch.no_grad():
+        original_output = model(input_tensor)
+        masked_output = model(masked_input)
+        output_change = (original_output - masked_output).abs().sum().item()
+    print(f"遮蔽高注意力區域後的輸出變化: {output_change}")
 
 if __name__ == "__main__":
     # 主程式入口
@@ -408,5 +463,11 @@ if __name__ == "__main__":
     # if os.path.exists('results_log.txt'):
     #     log_print("繪製準確率曲線...")
     #     plot_accuracy_vs_k(os.path.join(output_dir, 'accuracy_vs_k.png'))
+    if os.path.exists(model_path) and os.path.exists(test_data_dir):
+        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+            print("生成模型注意力圖...")
+            visualize_cbam_attention(model_path,
+                                    os.path.join(test_data_dir, test_images[0]),
+                                    os.path.join(output_dir, 'cbam_attention.png'))
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
