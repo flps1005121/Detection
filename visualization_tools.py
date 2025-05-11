@@ -2,18 +2,18 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import json
 from PIL import Image
-from torchvision import transforms, models
+from torchvision import transforms
 from backup_code.feature_extractor import SimCLRNet, device
 import umap
-
+import matplotlib.cm as cm
 import torch.nn.functional as F
-from skimage.util import view_as_blocks
 from skimage.transform import resize
+from contextlib import contextmanager
+from typing import Dict, List, Tuple, Generator
 
 # 設定支援中文字體
 import matplotlib
@@ -155,58 +155,6 @@ def visualize_feature_space(
     plt.close()
     print(f"特徵空間 ({method}) 視覺化已儲存於: {save_path}")
 
-'''def visualize_feature_space(features_file, data_dir, labels_file=None, save_path='visualizations/feature_space.png'):
-    """使用 t-SNE 視覺化已提取的特徵空間，根據檔名 {類別}_{編號}.jpg 自動標籤"""
-    features = np.load(features_file)
-    labels, class_names = [], []
-    image_files = []
-
-    # 蒐集資料
-    for file_name in sorted(os.listdir(data_dir)):
-        if file_name.lower().endswith(('.jpg', '.png', '.jpeg', '.webp')):
-            image_files.append(file_name)
-            class_name = file_name.split('_')[0]
-            if class_name not in class_names:
-                class_names.append(class_name)
-            labels.append(class_names.index(class_name))
-
-    labels = np.array(labels)
-
-    # 驗證資料對齊
-    if len(features) != len(labels):
-        print("特徵數量與標籤不符，請確認提取順序一致")
-        return
-
-    # 自動計算 perplexity
-    perplexity = max(5, min(30, features.shape[0] // 10))
-
-    # t-SNE 降維
-    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-    features_2d = tsne.fit_transform(np.nan_to_num(features))
-
-    # 繪圖
-    plt.figure(figsize=(10, 8))
-    unique_labels = np.unique(labels)
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_labels)))
-
-    for i, label in enumerate(unique_labels):
-        mask = labels == label
-        plt.scatter(
-            features_2d[mask, 0], features_2d[mask, 1],
-            c=[colors[i]], label=class_names[label], s=150, alpha=0.7, edgecolors='w'
-        )
-
-    plt.legend(title='類別', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.title('特徵空間 (t-SNE)')
-    plt.xlabel('維度 1')
-    plt.ylabel('維度 2')
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    log_print(f"特徵空間視覺化結果已儲存於: {save_path}")'''
-
 def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualizations/confusion_matrix.png'):
     """繪製混淆矩陣"""
     cm = confusion_matrix(query_labels, preds)
@@ -219,28 +167,6 @@ def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualiz
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"混淆矩陣已儲存於: {save_path}")
-
-'''def plot_tsne(support_prototypes, query_embeddings, query_labels, idx_to_class, save_path='visualizations/tsne_plot.png'):
-    """繪製支持集和查詢集的 t-SNE 視覺化"""
-    embeddings = torch.cat([support_prototypes, query_embeddings]).numpy()
-    labels = np.concatenate([np.arange(len(support_prototypes)), query_labels])
-    tsne = TSNE(n_components=2, perplexity=min(5, len(embeddings)-1), learning_rate=100)
-    reduced = tsne.fit_transform(embeddings)
-
-    plt.figure(figsize=(8, 6))
-    for i in range(len(idx_to_class)):
-        idx = np.where(labels == i)
-        plt.scatter(reduced[idx, 0], reduced[idx, 1], label=idx_to_class[i])
-    plt.legend(title='類別')
-    plt.title('嵌入空間的 t-SNE 視覺化')
-    plt.xlabel('維度 1')
-    plt.ylabel('維度 2')
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    log_print(f"t-SNE 視覺化已儲存於: {save_path}")'''
-
-
 
 def visualize_attention_maps(model_path, image_path, save_path='visualizations/attention_map.png'):
     """視覺化模型的注意力圖，顯示模型關注的圖像區域"""
@@ -365,61 +291,130 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
     print(f"分層特徵熱圖已儲存於: {save_path}")
 
 
-def visualize_cbam_attention(model_path, image_path, save_path='visualizations/cbam_attention.png', device='cpu'):
-    print(f"視覺化 CBAM 注意力圖: {image_path}")
+@contextmanager
+def register_hooks(target_layer: torch.nn.Module) -> Generator[Tuple[List[torch.Tensor], List[torch.Tensor]], None, None]:
+    gradients: List[torch.Tensor] = []
+    activations: List[torch.Tensor] = []
+    def forward_hook(module, input, output):
+        activations.append(output.detach())
+    def full_backward_hook(module, grad_in, grad_out):
+        gradients.append(grad_out[0].detach())
+    forward_handle = target_layer.register_forward_hook(forward_hook)
+    backward_handle = target_layer.register_full_backward_hook(full_backward_hook)
+    try:
+        yield gradients, activations
+    finally:
+        forward_handle.remove()
+        backward_handle.remove()
 
-    model = SimCLRNet().to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
+def visualize_GCAM_maps(
+    model_path: str,
+    image_path: str,
+    save_path: str = 'visualizations/GCAM_map.png',
+    device: torch.device = torch.device('cpu')
+) -> None:
+    """視覺化模型的 Grad-CAM 注意力圖，顯示模型關注的圖像區域"""
+    print(f"正在為圖片生成 Grad-CAM 注意力圖：{image_path}")
+
+    # 載入預訓練模型
+    model = SimCLRNet(feature_dim=128).to(device)
+    try:
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+        print(f"成功載入模型權重: {model_path}")
+    except Exception as e:
+        print(f"載入模型權重失敗: {e}")
+        return
+
     model.eval()
+
+    # 定義要提取的層
+    target_layers = {
+        '早期層': model.backbone.features[4],
+        '中期層': model.backbone.features[8],
+        '後期層': model.backbone.features[12],
+    }
+
+    # 讀取並預處理圖像
+    try:
+        original_img = Image.open(image_path).convert('RGB')
+        original_np = np.array(original_img)
+        original_size = original_np.shape[:2]  # (H, W)
+    except Exception as e:
+        print(f"錯誤：無法載入圖像 {image_path}，原因：{e}")
+        return
 
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
+    input_tensor = transform(original_img).unsqueeze(0).to(device)
 
-    img = Image.open(image_path).convert('RGB')
-    input_tensor = transform(img).unsqueeze(0).to(device)
+    # 儲存熱圖
+    heatmaps: Dict[str, np.ndarray] = {}
 
-    _ = model(input_tensor)  # forward 呼叫，CBAM attention 會自動儲存
-    channel_attention = model.cbam.last_channel_attention[0].squeeze().cpu().numpy()  # (C,)
-    spatial_attention = model.cbam.last_spatial_attention[0].squeeze().cpu().numpy()  # (H, W)
+    # 對每個目標層生成 Grad-CAM 熱圖
+    for layer_name, target_layer in target_layers.items():
+        with register_hooks(target_layer) as (gradients, activations):
+            # 前向傳播
+            output = model(input_tensor)
+            class_idx = output.argmax(dim=1).item()
 
+            # 反向傳播
+            model.zero_grad()
+            target = output[0, class_idx]
+            target.backward()
 
-    original_np = np.array(img.resize((224, 224)))
+            # 計算 Grad-CAM
+            grad = gradients[0]  # [B, C, H, W]
+            activation = activations[0]  # [B, C, H, W]
+            weights = grad.mean(dim=(2, 3), keepdim=True)
+            gradcam_map = F.relu((weights * activation).sum(dim=1)).squeeze().cpu().numpy()
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+            # 正規化並調整大小
+            if gradcam_map.max() > gradcam_map.min():
+                gradcam_map = (gradcam_map - gradcam_map.min()) / (gradcam_map.max() - gradcam_map.min() + 1e-8)
+            gradcam_map = resize(gradcam_map, original_size, order=1, mode='constant', anti_aliasing=True)
+            heatmaps[layer_name] = gradcam_map
 
-    axes[0].imshow(original_np)
-    axes[0].set_title("原始圖片")
-    axes[0].axis('off')
+    # 視覺化
+    fig, axes = plt.subplots(2, len(target_layers) + 1, figsize=(16, 8))
 
-    spatial_resized = resize(spatial_attention, original_np.shape[:2], order=0, mode='edge', anti_aliasing=False)
-    axes[1].imshow(spatial_resized, cmap='jet')
-    axes[1].set_title("CBAM 空間注意力圖")
-    axes[1].axis('off')
+    # 顯示原始圖像
+    axes[0, 0].imshow(original_np)
+    axes[0, 0].set_title('原始圖像')
+    axes[0, 0].axis('off')
+    axes[1, 0].axis('off')
 
+    # 顯示每個層的熱圖和疊加圖
+    for i, (name, heatmap) in enumerate(heatmaps.items()):
+        layer_idx = i + 1
 
-    import matplotlib.cm as cm
-    colored = cm.jet(spatial_resized)[..., :3]
-    overlay = np.clip((colored * 0.3 + original_np / 255 * 0.7), 0, 1)
-    axes[2].imshow(overlay)
-    axes[2].set_title("疊加後的 CBAM 空間注意力")
-    axes[2].axis('off')
+        # 顯示熱圖
+        axes[0, layer_idx].imshow(heatmap, cmap='jet')
+        axes[0, layer_idx].set_title(f'{name} 熱圖')
+        axes[0, layer_idx].axis('off')
 
-    plt.tight_layout()
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path, dpi=300)
-    plt.close()
-    print(f"CBAM 注意力圖已儲存至 {save_path}")
-    high_attention_mask = spatial_resized > np.percentile(spatial_resized, 90)
-    masked_input = input_tensor.clone()
-    masked_input[:, :, high_attention_mask] = 0
-    with torch.no_grad():
-        original_output = model(input_tensor)
-        masked_output = model(masked_input)
-        output_change = (original_output - masked_output).abs().sum().item()
-    print(f"遮蔽高注意力區域後的輸出變化: {output_change}")
+        # 生成疊加圖
+        colored_heatmap = cm.jet(heatmap)[:, :, :3]
+        original_normalized = original_np.astype(float) / 255.0
+        overlay = (colored_heatmap * 0.7 + original_normalized * 0.3)
+        overlay = np.clip(overlay, 0, 1)
+
+        # 顯示疊加圖
+        axes[1, layer_idx].imshow(overlay)
+        axes[1, layer_idx].set_title(f'{name} 疊加於原圖')
+        axes[1, layer_idx].axis('off')
+
+    # 保存結果
+    try:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Grad-CAM 熱圖已儲存於: {save_path}")
+    except Exception as e:
+        print(f"錯誤：無法保存圖片到 {save_path}，原因：{e}")
 
 if __name__ == "__main__":
     # 主程式入口
@@ -430,6 +425,7 @@ if __name__ == "__main__":
 
     # 設置文件路徑
     model_path = 'output/simclr_mobilenetv3.pth'
+    #model_path = 'output/best_model.pth'
     data_dir = 'dataset/train'
     test_data_dir = 'feature_db_netwk/test/eagle'
     losses_file = 'output/training_losses.json'
@@ -459,15 +455,12 @@ if __name__ == "__main__":
             visualize_attention_maps(model_path,
                                     os.path.join(test_data_dir, test_images[0]),
                                     os.path.join(output_dir, 'attention_map.png'))
-    # # 繪製準確率曲線（需要 results_log.txt）
-    # if os.path.exists('results_log.txt'):
-    #     log_print("繪製準確率曲線...")
-    #     plot_accuracy_vs_k(os.path.join(output_dir, 'accuracy_vs_k.png'))
+
     if os.path.exists(model_path) and os.path.exists(test_data_dir):
         if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
             print("生成模型注意力圖...")
-            visualize_cbam_attention(model_path,
+            visualize_GCAM_maps(model_path,
                                     os.path.join(test_data_dir, test_images[0]),
-                                    os.path.join(output_dir, 'cbam_attention.png'))
+                                    os.path.join(output_dir, 'GCAM_map.png'))
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
