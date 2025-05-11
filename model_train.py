@@ -28,53 +28,6 @@ FEATURE_DIM = 128
 # 設置設備
 device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
-class CBAM(nn.Module):
-    def __init__(self, channels, reduction=16, kernel_size=7):
-        super().__init__()
-        # Channel Attention
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Conv2d(channels, channels // reduction, 1, bias=False),
-            nn.ReLU(),
-            nn.Conv2d(channels // reduction, channels, 1, bias=False)
-        )
-        self.sigmoid_channel = nn.Sigmoid()
-
-        # Spatial Attention
-        self.conv_spatial = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
-        self.sigmoid_spatial = nn.Sigmoid()
-
-        # For visualization
-        self.last_channel_attention = None
-        self.last_spatial_attention = None
-
-    def forward(self, x):
-        # --- Channel Attention ---
-        avg_out = self.fc(self.avg_pool(x))
-        max_out = self.fc(self.max_pool(x))
-        channel_attention = self.sigmoid_channel(avg_out + max_out)
-
-        # 🔸 儲存 channel attention（可用於視覺化）
-        self.last_channel_attention = channel_attention.detach()
-
-        x = x * channel_attention  # Broadcasting: [B, C, H, W] * [B, C, 1, 1]
-
-        # --- Spatial Attention ---
-        avg_out = torch.mean(x, dim=1, keepdim=True)       # [B, 1, H, W]
-        max_out, _ = torch.max(x, dim=1, keepdim=True)      # [B, 1, H, W]
-        x_cat = torch.cat([avg_out, max_out], dim=1)        # [B, 2, H, W]
-        spatial_attention = self.sigmoid_spatial(self.conv_spatial(x_cat))  # [B, 1, H, W]
-
-        # 🔸 儲存 spatial attention（可用於視覺化）
-        self.last_spatial_attention = spatial_attention.detach()
-
-        x = x * spatial_attention
-
-        return x
-
-
-
 # 資料集定義
 class SimCLRDataset(Dataset):
     def __init__(self, root_dir, transform):
@@ -108,8 +61,6 @@ class SimCLRNet(nn.Module):
         self.backbone = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
         self.backbone.classifier = nn.Identity()
 
-        self.cbam = CBAM(channels=576)  # CBAM 模組
-
         self.projector = nn.Sequential(
             nn.Linear(576, 512),             # 第一層全連接層
             nn.BatchNorm1d(512),             # 批次正規化，穩定訓練
@@ -125,14 +76,12 @@ class SimCLRNet(nn.Module):
 
     def forward(self, x):
         h = self.backbone.features(x)
-        h = self.cbam(h)  # CBAM 模組
         h = F.adaptive_avg_pool2d(h, (1, 1))
         h = h.view(h.size(0), -1)
         # 添加特徵維度調試資訊 (第一次執行時可以取消這行的註解來檢查維度)
         # print(f"Feature shape: {h.shape}")
         z = self.projector(h)
         return F.normalize(z, dim=1)
-
 
 # 對比學習損失函數
 class NTXentLoss(nn.Module):
