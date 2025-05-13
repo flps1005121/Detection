@@ -9,7 +9,7 @@ import datetime  # 導入 datetime 模組用於時間戳記
 import sqlite3   # 添加SQLite數據庫支持
 
 # 導入我們剛創建的特徵提取器
-from backup_code.feature_extractor import ImageFeatureExtractor
+from feature_extractor import ImageFeatureExtractor
 
 def log_to_file(log_file, message, print_to_console=True):
     """將訊息同時輸出到控制台和日誌檔案"""
@@ -99,8 +99,8 @@ def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file
         img_name = os.path.basename(img_path)
         class_name = test_dataset.classes[class_idx.item()]
         
-        # 使用原始圖像路徑進行處理
-        process_test_image(img_path, img_name, train_features, train_file_paths, extractor, top_k, results, log_file, class_name)
+        # 使用原始圖像路徑進行處理，傳入標籤參數
+        process_test_image(img_path, img_name, train_features, train_file_paths, train_labels, extractor, top_k, results, log_file, class_name)
     
     display_results_summary(results, log_file)
     
@@ -110,7 +110,7 @@ def predict_and_display(test_dir, top_k=5, db_file='train_features.db', log_file
     
     return results
 
-def process_test_image(test_img_path, test_img_name, train_features, train_file_paths, extractor, top_k, results, log_file=None, class_name=None):
+def process_test_image(test_img_path, test_img_name, train_features, train_file_paths, train_labels, extractor, top_k, results, log_file=None, class_name=None):
     """處理單個測試圖像並添加結果"""
     # 直接使用extract_features從測試圖像提取特徵
     query_feature = extractor.extract_features(test_img_path)
@@ -124,7 +124,7 @@ def process_test_image(test_img_path, test_img_name, train_features, train_file_
     for idx, train_feature in enumerate(train_features):
         # 余弦相似度計算: cos(θ) = A·B / (||A||·||B||)
         sim = np.dot(query_feature, train_feature) / (np.linalg.norm(query_feature) * np.linalg.norm(train_feature))
-        similarities.append((train_file_paths[idx], sim))
+        similarities.append((train_labels[idx], sim))
     
     # 根據相似度排序
     similarities.sort(key=lambda x: x[1], reverse=True)
@@ -141,12 +141,8 @@ def process_test_image(test_img_path, test_img_name, train_features, train_file_
     log_to_file(log_file, f"測試圖片: {test_img_name}" + (f" (類別: {class_name})" if class_name else ""))
     log_to_file(log_file, "-"*50)
 
-    # 找出最相似的圖片（第一個結果）
-    most_similar_path, highest_similarity = similar_images[0]
-    most_similar_name = os.path.basename(most_similar_path)
-    
-    # 從檔案路徑提取類別名稱 (假設路徑格式為：.../類別/檔名.jpg)
-    most_similar_class = os.path.basename(os.path.dirname(most_similar_path))
+    # 找出最相似的結果（第一個結果）
+    most_similar_class, highest_similarity = similar_images[0]
     
     # 實現雙重閾值判斷邏輯
     prediction_confidence = "未知"
@@ -158,52 +154,56 @@ def process_test_image(test_img_path, test_img_name, train_features, train_file_
         prediction_reason = f"相似度 {highest_similarity:.4f} > 0.8"
     elif highest_similarity < 0.7:
         # 低可信度 - 判定為未知類別
-        most_similar_name = "未知類別"
         most_similar_class = "未知類別"
         prediction_confidence = "低可信度"
         prediction_reason = f"相似度 {highest_similarity:.4f} < 0.7"
     else:
-        # 中等可信度 - 需要進一步分析相似度差距
-        if len(similar_images) > 1:
-            second_best_similarity = similar_images[1]
-            similarity_gap = highest_similarity - second_best_similarity
-            
-            # 若最佳與次佳相似度差距大於0.1，採用最佳結果
-            if similarity_gap > 0.1:
-                prediction_confidence = "中可信度-採用"
-                prediction_reason = f"相似度差距 {similarity_gap:.4f} > 0.1"
-            else:
-                most_similar_name = "未知類別"
-                most_similar_class = "未知類別"
-                prediction_confidence = "中可信度-拒絕"
-                prediction_reason = f"相似度差距 {similarity_gap:.4f} <= 0.1"
+        # 中等可信度 - 按類別分組，比較不同類別間的相似度差距
+        class_best = {}
+        # 將相似圖像按類別分組，每個類別只保留最高相似度
+        for label, sim in similarities:
+            if label not in class_best or sim > class_best[label][1]:
+                class_best[label] = (label, sim)
+        
+        # 按相似度排序類別
+        sorted_classes = sorted([(label, sim) for label, (_, sim) in class_best.items()], 
+                               key=lambda x: x[1], reverse=True)
+        
+        # 如果只有一個類別，則採用該類別
+        if len(sorted_classes) == 1:
+            best_class, best_sim = sorted_classes[0]
+            most_similar_class = best_class
+            prediction_confidence = "中可信度-採用"
+            prediction_reason = "僅有一個匹配類別"
         else:
-            most_similar_name = "未知類別"
-            most_similar_class = "未知類別"
-            prediction_confidence = "中可信度-拒絕"
-            prediction_reason = "找不到次佳匹配以比較差距"
+            # 獲取最高相似度的類別 (A) 和次高相似度的類別 (B)
+            best_class, best_sim = sorted_classes[0]
+            second_best_class, second_best_sim = sorted_classes[1]
+            similarity_gap = best_sim - second_best_sim
+            
+            # 若最佳與次佳類別相似度差距大於0.1，採用最佳結果
+            if similarity_gap > 0.1:
+                most_similar_class = best_class
+                prediction_confidence = "中可信度-採用"
+                prediction_reason = f"類別間相似度差距 {similarity_gap:.4f} > 0.1 (最佳:{best_class}={best_sim:.4f}, 次佳:{second_best_class}={second_best_sim:.4f})"
+            else:
+                most_similar_class = "未知類別"
+                prediction_confidence = "中可信度-拒绝"
+                prediction_reason = f"類別間相似度差距 {similarity_gap:.4f} <= 0.1 (最佳:{best_class}={best_sim:.4f}, 次佳:{second_best_class}={second_best_sim:.4f})"
 
-    log_to_file(log_file, f"最相似圖片: {most_similar_name} (類別: {most_similar_class}, 相似度: {highest_similarity:.4f})")
+    log_to_file(log_file, f"最相似類別: {most_similar_class} (相似度: {highest_similarity:.4f})")
     log_to_file(log_file, f"判斷可信度: {prediction_confidence}")
     log_to_file(log_file, f"判斷依據: {prediction_reason}")
     log_to_file(log_file, "-"*50)
-
-    # 顯示所有相似圖片的排名
-    log_to_file(log_file, "所有相似圖片排名:")
-    for i, (img_path, similarity) in enumerate(similar_images):
-        img_class = os.path.basename(os.path.dirname(img_path))
-        log_to_file(log_file, f"  {i+1}. {os.path.basename(img_path)} (類別: {img_class}) - 相似度: {similarity:.4f}")
 
     # 保存結果以便後續整理
     results.append({
         'test_image': test_img_name,
         'class_name': class_name,
-        'most_similar': most_similar_name,
         'most_similar_class': most_similar_class,
         'similarity': highest_similarity,
         'confidence': prediction_confidence,
-        'reason': prediction_reason,
-        'all_similars': [(os.path.basename(p), os.path.basename(os.path.dirname(p)), s) for p, s in similar_images]
+        'reason': prediction_reason
     })
 
 def display_results_summary(results, log_file=None):

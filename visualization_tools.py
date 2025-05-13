@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import json
 from PIL import Image
 from torchvision import transforms, models
-from backup_code.feature_extractor import SimCLRNet, device
+from feature_extractor import SimCLRNet, device
 import umap
 
 import torch.nn.functional as F

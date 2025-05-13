@@ -65,7 +65,7 @@ class ImageFeatureExtractor:
         # 檢查是否需要強制刷新數據庫
         if os.path.exists(db_file) and not force_refresh:
             print(f"發現已存在的數據庫 {db_file}，正在載入...")
-            from backup_code.old_compare import load_features_from_database
+            from old_compare import load_features_from_database
             return load_features_from_database(db_file)
         
         # 使用ImageFolder讀取數據集
