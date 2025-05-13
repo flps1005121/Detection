@@ -9,7 +9,7 @@ import datetime
 import sqlite3
 
 # 導入特徵提取器
-from build_db import ImageFeatureExtractor
+from backup_code.build_db import ImageFeatureExtractor
 
 def log_to_file(log_file, message, print_to_console=True):
     """將訊息同時輸出到控制台和日誌檔案"""
