@@ -1,0 +1,11 @@
+
+========== 特徵向量比對開始 2025-05-14 09:58:03 ==========
+
+Top 1: 類別=vending, 相似度=0.1832, 圖片=feature_db/train/vending/vending_0428_B35_03.jpg
+Top 2: 類別=bookcase, 相似度=0.1677, 圖片=feature_db/train/bookcase/bookcase_0503_B20_03.jpg
+Top 3: 類別=bookcase, 相似度=0.1590, 圖片=feature_db/train/bookcase/bookcase_0503_B20_11.jpg
+Top 4: 類別=bookcase, 相似度=0.1587, 圖片=feature_db/train/bookcase/bookcase_0503_B20_02.jpg
+Top 5: 類別=bookcase, 相似度=0.1279, 圖片=feature_db/train/bookcase/bookcase_0430_B28_05.jpg
+
+========== 比對結束 2025-05-14 09:58:03 ==========
+
