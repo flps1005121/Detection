@@ -46,27 +46,20 @@ def plot_losses(losses_file, save_path='loss_curve.png'):
             losses = [float(line.strip()) for line in f if line.strip()]
 
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(losses) + 1), losses, marker='o', linestyle='-', color='b', label='訓練損失')
-
-    if len(losses) > 5:
-        # 添加移動平均線
-        window_size = min(5, len(losses) // 3)
-        avg_losses = [
-            sum(losses[i:i + window_size]) / window_size
-            for i in range(len(losses) - window_size + 1)
-        ]
-        x_avg = list(range(window_size, window_size + len(avg_losses)))
-        plt.plot(x_avg, avg_losses, 'r--', label=f'{window_size}-輪次移動平均')
+    plt.plot(range(1, len(losses) + 1), losses, marker='o', linestyle='-', color='b', label='Training Loss')
 
     # 顯示最終損失值
     if losses:
-        plt.annotate(f'最終損失: {losses[-1]:.4f}',
-                     xy=(len(losses), losses[-1]),
-                     xytext=(len(losses)-5, losses[-1]+0.1),
-                     arrowprops=dict(arrowstyle="->", connectionstyle="arc3"))
+        final_epoch = len(losses)
+        final_loss = losses[-1]
+        plt.annotate(f'Final Loss: \n{final_loss:.4f}',
+                     xy=(final_epoch, final_loss),
+                     xytext=(final_epoch, final_loss + 0.2),
+                     arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=8),
+                     ha='center', va='bottom')
 
     plt.legend()
-    plt.title('訓練損失曲線')
+    plt.title('Training Loss Curve')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.grid(True)
@@ -79,7 +72,7 @@ def visualize_feature_space_from_db(
     db_file,
     data_dir,
     save_path='visualizations/feature_space.png',
-    title='特徵空間視覺化',
+    title='Feature Space Visualization',
     method='tsne',  # 'tsne' 或 'umap'
     random_state=42,
     table_name='features'
@@ -153,10 +146,10 @@ def visualize_feature_space_from_db(
             s=150, alpha=0.7, edgecolors='w'
         )
 
-    plt.legend(title='類別', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(title='Class', bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.title(f'{title} - {method.upper()}')
-    plt.xlabel('維度 1')
-    plt.ylabel('維度 2')
+    plt.xlabel('Dimension 1')
+    plt.ylabel('Dimension 2')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -169,13 +162,13 @@ def plot_confusion_matrix(query_labels, preds, idx_to_class, save_path='visualiz
     cm = confusion_matrix(query_labels, preds)
     disp = ConfusionMatrixDisplay(cm, display_labels=[idx_to_class[i] for i in range(len(idx_to_class))])
     disp.plot(cmap="Blues")
-    plt.title("查詢集混淆矩陣")
-    plt.xlabel("預測類別")
-    plt.ylabel("真實類別")
+    plt.title("Query Set Confusion Matrix")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"混淆矩陣已儲存於: {save_path}")
+    print(f"Confusion matrix saved at: {save_path}")
 
 def visualize_attention_maps(model_path, image_path, save_path='visualizations/attention_map.png'):
     """視覺化模型的注意力圖，顯示模型關注的圖像區域"""
@@ -198,9 +191,9 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
 
     # 定義要提取的層 (根據MobileNetV3的結構選擇不同層級)
     target_layers = {
-        '早期層': backbone.features[4],   # 初始特徵提取層
-        '中期層': backbone.features[8],   # 中間層
-        '後期層': backbone.features[12],  # 後期層
+        'Early Layer': backbone.features[4],   # 初始特徵提取層
+        'Mid Layer': backbone.features[8],   # 中間層
+        'Late Layer': backbone.features[12],  # 後期層
     }
 
     # 保存各層特徵圖
@@ -242,7 +235,7 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
 
     # 第一個子圖顯示原始圖像
     axes[0, 0].imshow(original_np)
-    axes[0, 0].set_title('原始圖像')
+    axes[0, 0].set_title('Original Image')
     axes[0, 0].axis('off')
 
     # 第一排空出一格
@@ -276,7 +269,7 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
 
         # 顯示熱力圖
         axes[0, layer_idx].imshow(attention, cmap='jet')
-        axes[0, layer_idx].set_title(f'{name} 熱圖')
+        axes[0, layer_idx].set_title(f'{name} Heatmap')
         axes[0, layer_idx].axis('off')
 
         # 將熱力圖映射為彩色圖
@@ -290,7 +283,7 @@ def visualize_attention_maps(model_path, image_path, save_path='visualizations/a
 
         # 顯示疊加後的圖像
         axes[1, layer_idx].imshow(overlay)
-        axes[1, layer_idx].set_title(f'{name} 疊加於原圖')
+        axes[1, layer_idx].set_title(f'{name} Overlay')
         axes[1, layer_idx].axis('off')
 
     plt.tight_layout()
@@ -338,9 +331,9 @@ def visualize_GCAM_maps(
 
     # 定義要提取的層
     target_layers = {
-        '早期層': model.backbone.features[4],
-        '中期層': model.backbone.features[8],
-        '後期層': model.backbone.features[12],
+        'Early Layer': model.backbone.features[4],
+        'Mid Layer': model.backbone.features[8],
+        'Late Layer': model.backbone.features[12],
     }
 
     # 讀取並預處理圖像
@@ -391,7 +384,7 @@ def visualize_GCAM_maps(
 
     # 顯示原始圖像
     axes[0, 0].imshow(original_np)
-    axes[0, 0].set_title('原始圖像')
+    axes[0, 0].set_title('Original Image')
     axes[0, 0].axis('off')
     axes[1, 0].axis('off')
 
@@ -401,7 +394,7 @@ def visualize_GCAM_maps(
 
         # 顯示熱圖
         axes[0, layer_idx].imshow(heatmap, cmap='jet')
-        axes[0, layer_idx].set_title(f'{name} 熱圖')
+        axes[0, layer_idx].set_title(f'{name} Heatmap')
         axes[0, layer_idx].axis('off')
 
         # 生成疊加圖
@@ -412,7 +405,7 @@ def visualize_GCAM_maps(
 
         # 顯示疊加圖
         axes[1, layer_idx].imshow(overlay)
-        axes[1, layer_idx].set_title(f'{name} 疊加於原圖')
+        axes[1, layer_idx].set_title(f'{name} Overlay')
         axes[1, layer_idx].axis('off')
 
     # 保存結果
@@ -447,10 +440,10 @@ if __name__ == "__main__":
     # 執行視覺化任務
     print("開始視覺化分析...")
 
-    # # 繪製損失曲線
-    # if os.path.exists(losses_file):
-    #     print("繪製訓練損失曲線...")
-    #     plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
+    # 繪製損失曲線
+    if os.path.exists(losses_file):
+        print("繪製訓練損失曲線...")
+        plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
 
     # 視覺化特徵空間 (使用已生成的特徵)
     if os.path.exists(features_file):
