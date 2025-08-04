@@ -236,7 +236,7 @@ def display_results_summary(results, log_file=None):
 # 直接執行的主程式碼
 if __name__ == "__main__":
     # 要判定的參數設定
-    test_dir = 'feature_db/test/'
+    test_dir = 'feature_db/train/'
     model_path = 'output/simclr_mobilenetv3.pth'
     db_file = 'output/train_features.db'
 
