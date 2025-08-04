@@ -14,6 +14,9 @@ import torch.nn.functional as F
 from skimage.transform import resize
 from contextlib import contextmanager
 from typing import Dict, List, Tuple, Generator
+import sqlite3
+import json
+
 
 # 設定支援中文字體
 import matplotlib
@@ -72,54 +75,59 @@ def plot_losses(losses_file, save_path='loss_curve.png'):
     plt.close()
     print(f"損失曲線已儲存於: {save_path}")
 
-def visualize_feature_space(
-    features_file,
-    data_dir=None,
-    labels_file=None,
+def visualize_feature_space_from_db(
+    db_file,
+    data_dir,
     save_path='visualizations/feature_space.png',
     title='特徵空間視覺化',
-    auto_label_from_filename=True,
     method='tsne',  # 'tsne' 或 'umap'
-    random_state=42
+    random_state=42,
+    table_name='features'
 ):
     """
-    使用 t-SNE 或 UMAP 將特徵空間降維並視覺化。
-    labels 來源可以從檔名自動推測，或讀入 labels_file（格式為每行一個整數）。
-
-    Args:
-        features_file (str): .npy 檔，儲存提取好的特徵
-        data_dir (str): 圖片目錄（若使用自動標籤）
-        labels_file (str): 標籤檔（若使用外部標籤）
-        save_path (str): 圖片儲存路徑
-        title (str): 圖片標題
-        auto_label_from_filename (bool): 是否從檔名解析類別
-        method (str): 降維方法，'tsne' 或 'umap'
-        random_state (int): 隨機種子，保證結果穩定
+    使用 t-SNE 或 UMAP 將特徵空間降維並視覺化，從 SQLite 資料庫讀取資料。
+    ...
     """
-    features = np.load(features_file)
-    labels, class_names = [], []
+    # 從資料庫讀取資料
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
 
-    if auto_label_from_filename and data_dir:
-        image_files = sorted([
-            f for f in os.listdir(data_dir)
-            if f.lower().endswith(('.jpg', '.png', '.jpeg', '.webp'))
-        ])
-        for file_name in image_files:
-            class_name = file_name.split('_')[0]
-            if class_name not in class_names:
-                class_names.append(class_name)
-            labels.append(class_names.index(class_name))
-        labels = np.array(labels)
-    elif labels_file:
-        labels = np.loadtxt(labels_file, dtype=int)
-        class_names = [f'Class {i}' for i in np.unique(labels)]
-    else:
-        raise ValueError("請提供 data_dir 或 labels_file 以生成標籤")
-
-    if len(features) != len(labels):
-        print("❗ 特徵數量與標籤數量不符，請確認資料順序")
+    # 使用一個固定的或正確的資料表名稱
+    print(f"嘗試查詢資料表: {table_name}")
+    try:
+        cursor.execute(f"SELECT feature, label FROM {table_name}")
+        rows = cursor.fetchall()
+        conn.close()
+    except sqlite3.OperationalError as e:
+        conn.close()
+        print(f"❗ SQL 查詢失敗：{e}")
+        print(f"請確認資料庫 `{db_file}` 中存在名為 `{table_name}` 的資料表。")
+        return
+    
+    if not rows:
+        print("❗ 資料庫中沒有找到資料，請確認資料表名稱和內容。")
         return
 
+    # 將資料轉換為 NumPy 陣列
+    features = []
+    labels = []
+    # 建立標籤映射，將字串標籤轉換為整數
+    class_map = {}
+    class_names = []
+    
+    for row in rows:
+        # 將 BLOB 數據轉換回 numpy 陣列
+        features.append(np.frombuffer(row[0], dtype=np.float64))
+        # 處理字串標籤，並將其轉換為整數
+        label_str = row[1]
+        if label_str not in class_map:
+            class_map[label_str] = len(class_names)
+            class_names.append(label_str)
+        labels.append(class_map[label_str])
+    
+    features = np.array(features)
+    labels = np.array(labels)
+    
     # 降維
     if method == 'tsne':
         perplexity = max(5, min(30, features.shape[0] // 10))
@@ -133,14 +141,15 @@ def visualize_feature_space(
 
     # 視覺化
     plt.figure(figsize=(10, 8))
-    unique_labels = np.unique(labels)
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_labels)))
+    unique_labels_int = np.unique(labels)
+    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_labels_int)))
 
-    for i, label in enumerate(unique_labels):
-        mask = labels == label
+    for i, label_int in enumerate(unique_labels_int):
+        mask = labels == label_int
         plt.scatter(
             reduced[mask, 0], reduced[mask, 1],
-            c=[colors[i]], label=class_names[label] if label < len(class_names) else f'Class {label}',
+            c=[colors[i]], 
+            label=class_names[label_int],
             s=150, alpha=0.7, edgecolors='w'
         )
 
@@ -429,7 +438,7 @@ if __name__ == "__main__":
     data_dir = 'dataset/train'
     test_data_dir = 'feature_db_netwk/test/eagle'
     losses_file = 'output/training_losses.json'
-    features_file = 'output/features/features.npy'
+    features_file = 'output/train_features.db'
     output_dir = 'output/visualizations'
 
     # 確保輸出目錄存在
@@ -438,29 +447,33 @@ if __name__ == "__main__":
     # 執行視覺化任務
     print("開始視覺化分析...")
 
-    # 繪製損失曲線
-    if os.path.exists(losses_file):
-        print("繪製訓練損失曲線...")
-        plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
+    # # 繪製損失曲線
+    # if os.path.exists(losses_file):
+    #     print("繪製訓練損失曲線...")
+    #     plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
 
     # 視覺化特徵空間 (使用已生成的特徵)
     if os.path.exists(features_file):
         print("視覺化特徵空間...")
-        visualize_feature_space(features_file, data_dir, save_path=os.path.join(output_dir, 'feature_space.png'))
+        visualize_feature_space_from_db(
+            db_file=features_file, 
+            data_dir=data_dir, 
+            table_name='features',
+            save_path=os.path.join(output_dir, 'feature_space.png')
+    )
+    # # 生成注意力圖
+    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
+    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+    #         print("生成模型注意力圖...")
+    #         visualize_attention_maps(model_path,
+    #                                 os.path.join(test_data_dir, test_images[0]),
+    #                                 os.path.join(output_dir, 'attention_map.png'))
 
-    # 生成注意力圖
-    if os.path.exists(model_path) and os.path.exists(test_data_dir):
-        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-            print("生成模型注意力圖...")
-            visualize_attention_maps(model_path,
-                                    os.path.join(test_data_dir, test_images[0]),
-                                    os.path.join(output_dir, 'attention_map.png'))
-
-    if os.path.exists(model_path) and os.path.exists(test_data_dir):
-        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-            print("生成模型注意力圖...")
-            visualize_GCAM_maps(model_path,
-                                    os.path.join(test_data_dir, test_images[0]),
-                                    os.path.join(output_dir, 'GCAM_map.png'))
+    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
+    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+    #         print("生成模型注意力圖...")
+    #         visualize_GCAM_maps(model_path,
+    #                                 os.path.join(test_data_dir, test_images[0]),
+    #                                 os.path.join(output_dir, 'GCAM_map.png'))
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
