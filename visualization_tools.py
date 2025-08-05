@@ -73,7 +73,7 @@ def visualize_feature_space_from_db(
     data_dir,
     save_path='visualizations/feature_space.png',
     title='Feature Space Visualization',
-    method='tsne',  # 'tsne' 或 'umap'
+    method='umap',  # 'tsne' 或 'umap'
     random_state=42,
     table_name='features'
 ):
@@ -126,7 +126,15 @@ def visualize_feature_space_from_db(
         perplexity = max(5, min(30, features.shape[0] // 10))
         reducer = TSNE(n_components=2, random_state=random_state, perplexity=perplexity)
     elif method == 'umap':
-        reducer = umap.UMAP(n_components=2, random_state=random_state)
+        # reducer = umap.UMAP(n_components=2, random_state=random_state)
+        # 嘗試1：較小的 n_neighbors 來強調局部結構
+        # reducer = umap.UMAP(n_neighbors=5, n_components=2, random_state=random_state)
+        
+        # 嘗試2：增加 min_dist 來讓群組更分散
+        reducer = umap.UMAP(n_neighbors=30, min_dist=1, n_components=2, random_state=random_state)
+        
+        # 嘗試3：同時調整兩個參數
+        # reducer = umap.UMAP(n_neighbors=10, min_dist=0.3, n_components=2, random_state=random_state)
     else:
         raise ValueError("method 必須為 'tsne' 或 'umap'")
 
@@ -152,6 +160,10 @@ def visualize_feature_space_from_db(
     plt.ylabel('Dimension 2')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
+    if method == 'tsne':
+        save_path = save_path.replace('.png', '_tsne.png')
+    elif method == 'umap':
+        save_path = save_path.replace('.png', '_umap.png')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -429,9 +441,9 @@ if __name__ == "__main__":
     model_path = 'output/simclr_mobilenetv3.pth'
     #model_path = 'output/best_model.pth'
     data_dir = 'dataset/train'
-    test_data_dir = 'feature_db_netwk/test/eagle'
+    test_data_dir = 'feature_db/train/eagle' 
     losses_file = 'output/training_losses.json'
-    features_file = 'output/train_features.db'
+    features_file = 'feature_db/train_features.db'
     output_dir = 'output/visualizations'
 
     # 確保輸出目錄存在
@@ -440,33 +452,33 @@ if __name__ == "__main__":
     # 執行視覺化任務
     print("開始視覺化分析...")
 
-    # 繪製損失曲線
-    if os.path.exists(losses_file):
-        print("繪製訓練損失曲線...")
-        plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
+    # # 繪製損失曲線
+    # if os.path.exists(losses_file):
+    #     print("繪製訓練損失曲線...")
+    #     plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
 
-    # 視覺化特徵空間 (使用已生成的特徵)
-    if os.path.exists(features_file):
-        print("視覺化特徵空間...")
-        visualize_feature_space_from_db(
-            db_file=features_file, 
-            data_dir=data_dir, 
-            table_name='features',
-            save_path=os.path.join(output_dir, 'feature_space.png')
-    )
-    # # 生成注意力圖
-    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
-    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成模型注意力圖...")
-    #         visualize_attention_maps(model_path,
-    #                                 os.path.join(test_data_dir, test_images[0]),
-    #                                 os.path.join(output_dir, 'attention_map.png'))
+    # # 視覺化特徵空間 (使用已生成的特徵)
+    # if os.path.exists(features_file):
+    #     print("視覺化特徵空間...")
+    #     visualize_feature_space_from_db(
+    #         db_file=features_file, 
+    #         data_dir=data_dir, 
+    #         table_name='features',
+    #         save_path=os.path.join(output_dir, 'feature_space.png')
+    # )
+    # 生成注意力圖
+    if os.path.exists(model_path) and os.path.exists(test_data_dir):
+        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+            print("生成模型注意力圖...")
+            visualize_attention_maps(model_path,
+                                    os.path.join(test_data_dir, test_images[0]),
+                                    os.path.join(output_dir, 'attention_map.png'))
 
-    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
-    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成模型注意力圖...")
-    #         visualize_GCAM_maps(model_path,
-    #                                 os.path.join(test_data_dir, test_images[0]),
-    #                                 os.path.join(output_dir, 'GCAM_map.png'))
+    if os.path.exists(model_path) and os.path.exists(test_data_dir):
+        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+            print("生成模型注意力圖...")
+            visualize_GCAM_maps(model_path,
+                                    os.path.join(test_data_dir, test_images[0]),
+                                    os.path.join(output_dir, 'GCAM_map.png'))
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
