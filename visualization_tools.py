@@ -151,7 +151,7 @@ def visualize_feature_space_from_db(
             reduced[mask, 0], reduced[mask, 1],
             c=[colors[i]], 
             label=class_names[label_int],
-            s=150, alpha=0.7, edgecolors='w'
+            s=20, alpha=0.7, edgecolors='w' # s 是點的大小
         )
 
     plt.legend(title='Class', bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -438,12 +438,12 @@ if __name__ == "__main__":
     print(f"使用設備: {device}")
 
     # 設置文件路徑
-    model_path = 'output/simclr_mobilenetv3.pth'
+    model_path = 'output/mobilenetv3-small-55df8e1f.pth'
     #model_path = 'output/best_model.pth'
     data_dir = 'dataset/train'
     test_data_dir = 'feature_db/train/eagle' 
-    losses_file = 'output/training_losses.json'
-    features_file = 'feature_db/train_features.db'
+    losses_file = 'output/training_losses_clear.json'
+    features_file = 'output/train_features.db'
     output_dir = 'output/visualizations'
 
     # 確保輸出目錄存在
@@ -455,30 +455,30 @@ if __name__ == "__main__":
     # # 繪製損失曲線
     # if os.path.exists(losses_file):
     #     print("繪製訓練損失曲線...")
-    #     plot_losses(losses_file, os.path.join(output_dir, 'loss_curve.png'))
+    #     plot_losses(losses_file, os.path.join(output_dir, 'mobilenetv3_loss_curve.png'))
 
-    # # 視覺化特徵空間 (使用已生成的特徵)
-    # if os.path.exists(features_file):
-    #     print("視覺化特徵空間...")
-    #     visualize_feature_space_from_db(
-    #         db_file=features_file, 
-    #         data_dir=data_dir, 
-    #         table_name='features',
-    #         save_path=os.path.join(output_dir, 'feature_space.png')
-    # )
+    # 視覺化特徵空間 (使用已生成的特徵)
+    if os.path.exists(features_file):
+        print("視覺化特徵空間...")
+        visualize_feature_space_from_db(
+            db_file=features_file, 
+            data_dir=data_dir, 
+            table_name='features',
+            save_path=os.path.join(output_dir, 'feature_space.png')
+    )
     # 生成注意力圖
-    if os.path.exists(model_path) and os.path.exists(test_data_dir):
-        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-            print("生成模型注意力圖...")
-            visualize_attention_maps(model_path,
-                                    os.path.join(test_data_dir, test_images[0]),
-                                    os.path.join(output_dir, 'attention_map.png'))
+    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
+    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+    #         print("生成模型注意力圖...")
+    #         visualize_attention_maps(model_path,
+    #                                 os.path.join(test_data_dir, test_images[0]),
+    #                                 os.path.join(output_dir, 'attention_map.png'))
 
-    if os.path.exists(model_path) and os.path.exists(test_data_dir):
-        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-            print("生成模型注意力圖...")
-            visualize_GCAM_maps(model_path,
-                                    os.path.join(test_data_dir, test_images[0]),
-                                    os.path.join(output_dir, 'GCAM_map.png'))
+    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
+    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+    #         print("生成模型注意力圖...")
+    #         visualize_GCAM_maps(model_path,
+    #                                 os.path.join(test_data_dir, test_images[0]),
+    #                                 os.path.join(output_dir, 'GCAM_map.png'))
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
