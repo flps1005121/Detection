@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from typing import Dict, List, Tuple, Generator
 import sqlite3
 import json
-
+import random
 
 # 設定支援中文字體
 import matplotlib
@@ -321,16 +321,20 @@ def register_hooks(target_layer: torch.nn.Module) -> Generator[Tuple[List[torch.
         forward_handle.remove()
         backward_handle.remove()
 
-def visualize_GCAM_maps(
+def visualize_GCAM_for_retrieval(
     model_path: str,
-    image_path: str,
+    query_path: str,
+    positive_path: str,
     save_path: str = 'visualizations/GCAM_map.png',
     device: torch.device = torch.device('cpu')
 ) -> None:
-    """視覺化模型的 Grad-CAM 注意力圖，顯示模型關注的圖像區域"""
-    print(f"正在為圖片生成 Grad-CAM 注意力圖：{image_path}")
+    """
+    為檢索任務生成 Grad-CAM 注意力圖
+    熱圖代表 query 圖哪些區域對於與 positive 圖的相似度貢獻最大
+    """
+    print(f"正在為 query 圖片生成 Grad-CAM：{query_path}")
 
-    # 載入預訓練模型
+    # 載入模型
     model = SimCLRNet(feature_dim=128).to(device)
     try:
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
@@ -341,86 +345,81 @@ def visualize_GCAM_maps(
 
     model.eval()
 
-    # 定義要提取的層
+    # 要提取的層
     target_layers = {
         'Early Layer': model.backbone.features[4],
         'Mid Layer': model.backbone.features[8],
         'Late Layer': model.backbone.features[12],
     }
 
-    # 讀取並預處理圖像
-    try:
-        original_img = Image.open(image_path).convert('RGB')
-        original_np = np.array(original_img)
-        original_size = original_np.shape[:2]  # (H, W)
-    except Exception as e:
-        print(f"錯誤：無法載入圖像 {image_path}，原因：{e}")
-        return
+    # 圖片讀取與預處理
+    def load_image(path):
+        img = Image.open(path).convert('RGB')
+        original_np = np.array(img)
+        size = original_np.shape[:2]
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        tensor = transform(img).unsqueeze(0).to(device)
+        return tensor, original_np, size
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
-    input_tensor = transform(original_img).unsqueeze(0).to(device)
+    query_tensor, query_np, query_size = load_image(query_path)
+    positive_tensor, positive_np, _ = load_image(positive_path)
 
     # 儲存熱圖
     heatmaps: Dict[str, np.ndarray] = {}
 
-    # 對每個目標層生成 Grad-CAM 熱圖
     for layer_name, target_layer in target_layers.items():
         with register_hooks(target_layer) as (gradients, activations):
             # 前向傳播
-            output = model(input_tensor)
-            class_idx = output.argmax(dim=1).item()
+            query_feat = model(query_tensor)
+            positive_feat = model(positive_tensor)
+
+            # 定義 scalar：cosine similarity
+            cos_sim = F.cosine_similarity(query_feat, positive_feat)
 
             # 反向傳播
             model.zero_grad()
-            target = output[0, class_idx]
-            target.backward()
+            cos_sim.backward()
 
-            # 計算 Grad-CAM
+            # Grad-CAM 計算
             grad = gradients[0]  # [B, C, H, W]
             activation = activations[0]  # [B, C, H, W]
             weights = grad.mean(dim=(2, 3), keepdim=True)
             gradcam_map = F.relu((weights * activation).sum(dim=1)).squeeze().cpu().numpy()
 
-            # 正規化並調整大小
+            # 正規化 + resize
             if gradcam_map.max() > gradcam_map.min():
                 gradcam_map = (gradcam_map - gradcam_map.min()) / (gradcam_map.max() - gradcam_map.min() + 1e-8)
-            gradcam_map = resize(gradcam_map, original_size, order=1, mode='constant', anti_aliasing=True)
+            gradcam_map = resize(gradcam_map, query_size, order=1, mode='constant', anti_aliasing=True)
             heatmaps[layer_name] = gradcam_map
 
     # 視覺化
     fig, axes = plt.subplots(2, len(target_layers) + 1, figsize=(16, 8))
-
-    # 顯示原始圖像
-    axes[0, 0].imshow(original_np)
-    axes[0, 0].set_title('Original Image')
+    axes[0, 0].imshow(query_np)
+    axes[0, 0].set_title('Query Image')
     axes[0, 0].axis('off')
+    axes[1, 0].imshow(positive_np)
+    axes[1, 0].set_title('Positive Image')
     axes[1, 0].axis('off')
 
-    # 顯示每個層的熱圖和疊加圖
     for i, (name, heatmap) in enumerate(heatmaps.items()):
-        layer_idx = i + 1
+        idx = i + 1
+        axes[0, idx].imshow(heatmap, cmap='jet')
+        axes[0, idx].set_title(f'{name} Heatmap')
+        axes[0, idx].axis('off')
 
-        # 顯示熱圖
-        axes[0, layer_idx].imshow(heatmap, cmap='jet')
-        axes[0, layer_idx].set_title(f'{name} Heatmap')
-        axes[0, layer_idx].axis('off')
+        # 疊加圖
+        colored = cm.jet(heatmap)[:, :, :3]
+        normalized = query_np.astype(float) / 255.0
+        overlay = np.clip(colored * 0.7 + normalized * 0.3, 0, 1)
+        axes[1, idx].imshow(overlay)
+        axes[1, idx].set_title(f'{name} Overlay')
+        axes[1, idx].axis('off')
 
-        # 生成疊加圖
-        colored_heatmap = cm.jet(heatmap)[:, :, :3]
-        original_normalized = original_np.astype(float) / 255.0
-        overlay = (colored_heatmap * 0.7 + original_normalized * 0.3)
-        overlay = np.clip(overlay, 0, 1)
-
-        # 顯示疊加圖
-        axes[1, layer_idx].imshow(overlay)
-        axes[1, layer_idx].set_title(f'{name} Overlay')
-        axes[1, layer_idx].axis('off')
-
-    # 保存結果
+    # 保存
     try:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.tight_layout()
@@ -429,6 +428,53 @@ def visualize_GCAM_maps(
         print(f"Grad-CAM 熱圖已儲存於: {save_path}")
     except Exception as e:
         print(f"錯誤：無法保存圖片到 {save_path}，原因：{e}")
+def auto_visualize_GCAM(model_path, test_data_dir, output_dir, query_img=None):
+    """自動幫 query 圖片找 positive 圖片，然後呼叫 visualize_GCAM_for_retrieval"""
+
+    # 先抓所有圖片
+    test_images = [f for f in os.listdir(test_data_dir) 
+                   if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+
+    if not test_images:
+        print("❌ 找不到測試圖片！")
+        return
+
+    # 如果沒指定 query，就用第一張
+    if query_img is None:
+        query_img = test_images[0]
+
+    query_path = os.path.join(test_data_dir, query_img)
+    
+    # positive_data_dir = 'feature_db/train/bookcase' 
+    
+    # positive_images = [f for f in os.listdir(positive_data_dir)
+    #                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+    
+    # positive_img = random.choice(positive_images)
+
+    # 選一張不同的圖當 positive
+    possible_positives = [img for img in test_images if img != query_img]
+    if possible_positives:
+        positive_img = random.choice(possible_positives)
+    else:
+        # 如果只有一張圖，就 fallback 成 query 自己
+        positive_img = query_img
+
+    positive_path = os.path.join(test_data_dir, positive_img)
+
+    save_path = os.path.join(output_dir, f'GCAM_{os.path.splitext(query_img)[0]}.png')
+
+    print(f"Query 圖片: {query_path}")
+    print(f"Positive 圖片: {positive_path}")
+    print(f"輸出路徑: {save_path}")
+
+    # 呼叫原本的函式
+    visualize_GCAM_for_retrieval(
+        model_path=model_path,
+        query_path=query_path,
+        positive_path=positive_path,
+        save_path=save_path
+    )
 
 if __name__ == "__main__":
     # 主程式入口
@@ -438,10 +484,11 @@ if __name__ == "__main__":
     print(f"使用設備: {device}")
 
     # 設置文件路徑
-    model_path = 'output/mobilenetv3-small-55df8e1f.pth'
-    #model_path = 'output/best_model.pth'
+    # model_path = 'output/mobilenetv3-small-55df8e1f.pth'
+    model_path = 'output/best_model.pth'
     data_dir = 'dataset/train'
     test_data_dir = 'feature_db/train/eagle' 
+    positive_path = 'feature_db/train/bookcase' 
     losses_file = 'output/training_losses_clear.json'
     features_file = 'output/train_features.db'
     output_dir = 'output/visualizations'
@@ -457,15 +504,15 @@ if __name__ == "__main__":
     #     print("繪製訓練損失曲線...")
     #     plot_losses(losses_file, os.path.join(output_dir, 'mobilenetv3_loss_curve.png'))
 
-    # 視覺化特徵空間 (使用已生成的特徵)
-    if os.path.exists(features_file):
-        print("視覺化特徵空間...")
-        visualize_feature_space_from_db(
-            db_file=features_file, 
-            data_dir=data_dir, 
-            table_name='features',
-            save_path=os.path.join(output_dir, 'feature_space.png')
-    )
+    # # 視覺化特徵空間 (使用已生成的特徵)
+    # if os.path.exists(features_file):
+    #     print("視覺化特徵空間...")
+    #     visualize_feature_space_from_db(
+    #         db_file=features_file, 
+    #         data_dir=data_dir, 
+    #         table_name='features',
+    #         save_path=os.path.join(output_dir, 'feature_space.png')
+    # )
     # 生成注意力圖
     # if os.path.exists(model_path) and os.path.exists(test_data_dir):
     #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
@@ -474,11 +521,14 @@ if __name__ == "__main__":
     #                                 os.path.join(test_data_dir, test_images[0]),
     #                                 os.path.join(output_dir, 'attention_map.png'))
 
-    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
-    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成模型注意力圖...")
-    #         visualize_GCAM_maps(model_path,
-    #                                 os.path.join(test_data_dir, test_images[0]),
-    #                                 os.path.join(output_dir, 'GCAM_map.png'))
+    if os.path.exists(model_path) and os.path.exists(test_data_dir):
+        if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
+            print("生成模型注意力圖...")
+            print(test_images[0] + " vs " + test_images[-1])
+            auto_visualize_GCAM(
+                model_path="output/best_model.pth",
+                test_data_dir="feature_db/train/eagle",
+                output_dir="output/visualizations"
+            )
 
     print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
