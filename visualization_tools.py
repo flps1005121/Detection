@@ -703,6 +703,7 @@ def visualize_comparison_gcam(
     """
     通用的 Grad-CAM 對比視覺化函式。
     能處理 SimCLRNet 和標準的 torchvision 分類模型。
+    (版本更新：移除主標題，放大所有文字)
     """
     print(f"正在生成對比圖 ({comparison_label}): {os.path.basename(query_path)} vs {os.path.basename(comparison_path)}")
 
@@ -750,9 +751,13 @@ def visualize_comparison_gcam(
 
     # --- 繪製 ---
     fig, axes = plt.subplots(1, len(target_layers) + 2, figsize=(20, 5))
-    fig.suptitle(f'{model_type.upper()} Model: Query vs {comparison_label} Sample', fontsize=16)
-    axes[0].imshow(query_np); axes[0].set_title('Query'); axes[0].axis('off')
-    axes[1].imshow(comparison_np); axes[1].set_title(comparison_label); axes[1].axis('off')
+    
+    # --- 修改 1：移除主標題 ---
+    # fig.suptitle(f'{model_type.upper()} Model: Query vs {comparison_label} Sample', fontsize=16)
+    
+    # --- 修改 2：放大子圖標題 ---
+    axes[0].imshow(query_np); axes[0].set_title('Query', fontsize=16); axes[0].axis('off')
+    axes[1].imshow(comparison_np); axes[1].set_title(comparison_label, fontsize=16); axes[1].axis('off')
 
     # 計算特徵和相似度
     query_feat = feature_extractor(query_tensor).flatten(1)
@@ -761,7 +766,6 @@ def visualize_comparison_gcam(
     
     for i, (layer_name, target_layer) in enumerate(target_layers.items()):
         with register_hooks(target_layer) as (gradients, activations):
-            # 重新計算特徵和相似度以觸發 backward
             q_feat = feature_extractor(query_tensor).flatten(1)
             c_feat = feature_extractor(comparison_tensor).flatten(1)
             cos_sim = F.cosine_similarity(q_feat, c_feat)
@@ -778,11 +782,16 @@ def visualize_comparison_gcam(
             
             colored = cm.jet(gradcam_map)[:, :, :3]
             overlay = np.clip(colored * 0.7 + normalized_query_np * 0.3, 0, 1)
-            axes[i + 2].imshow(overlay); axes[i + 2].set_title(f'{layer_name}'); axes[i + 2].axis('off')
+            
+            # --- 修改 2：放大子圖標題 ---
+            axes[i + 2].imshow(overlay); axes[i + 2].set_title(f'{layer_name}', fontsize=16); axes[i + 2].axis('off')
 
     color = "orange" if comparison_label == "Positive" else "lightblue"
-    plt.figtext(0.5, 0.01, f'Cosine Similarity: {cos_sim_final.item():.4f}', ha="center", fontsize=12, bbox={"facecolor": color, "alpha":0.5, "pad":5})
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    
+    # --- 修改 3：放大餘弦相似度文字 ---
+    plt.figtext(0.5, 0.01, f'Cosine Similarity: {cos_sim_final.item():.4f}', ha="center", fontsize=14, bbox={"facecolor": color, "alpha":0.5, "pad":5})
+    
+    plt.tight_layout(rect=[0, 0.05, 1, 1]) # 調整佈局以適應無主標題的情況
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"✨ 對比圖已儲存於: {save_path}")
@@ -831,37 +840,6 @@ if __name__ == "__main__":
     #         data_dir=data_dir, 
     #         table_name='features',
     #         save_path=os.path.join(output_dir, 'feature_space_clear.png')
-    # )
-    # 生成注意力圖
-    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
-    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成模型注意力圖...")
-    #         visualize_attention_maps(model_path,
-    #                                 os.path.join(test_data_dir, test_images[0]),
-    #                                 os.path.join(output_dir, 'attention_map.png'))
-
-    # if os.path.exists(model_path) and os.path.exists(test_data_dir):
-    #     if test_images := [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成模型注意力圖...")
-    #         print(test_images[0] + " vs " + test_images[-1])
-    #         auto_visualize_GCAM(
-    #             model_path="output/best_model.pth",
-    #             test_data_dir="feature_db/train/eagle",
-    #             output_dir="output/visualizations"
-    #         )
-    # if os.path.exists(clear_model_path) and os.path.exists(test_data_dir):
-    #     if [f for f in os.listdir(test_data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]:
-    #         print("生成clear模型注意力圖...")
-    #         auto_visualize_clear_GCAM(
-    #             model_path=clear_model_path,
-    #             test_data_dir=test_data_dir,
-    #             output_dir=output_dir
-    #         )
-    # else:
-    #     if not os.path.exists(clear_model_path):
-    #         print(f"❌ 錯誤: 找不到模型權重文件 {clear_model_path}")
-    #     if not os.path.exists(test_data_dir):
-    #         print(f"❌ 錯誤: 找不到測試資料夾 {test_data_dir}")
 
     # print(f"視覺化分析完成！所有結果已保存至 {output_dir} 目錄")
 
